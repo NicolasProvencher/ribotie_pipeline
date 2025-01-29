@@ -1,5 +1,5 @@
 #!/usr/bin/env nextflow
-
+// Le code marche bien il me reste de verifier si le MultiQc fonctionne comme c'est souhaiter 
 nextflow.enable.dsl = 2
 
 params.input = "/home/machinegun/output2/**/*.fastq"
