@@ -59,6 +59,7 @@ process TRIM_GALORE {
         --trim-n \
         --length 25 \
         --quality 20 \
+        --max_length 40 \
         $reads
     """
 }
