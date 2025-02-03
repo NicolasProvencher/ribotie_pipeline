@@ -35,7 +35,7 @@ process FASTQC_PRE {
     tuple val(gse), val(sample_id), path("*_fastqc.html"), path("*_fastqc.zip"), emit: fastqc_output
     
     script:
-    """/home/ilyass09/env.yml
+    """
     fastqc --quiet $reads
     """
 }
@@ -62,7 +62,7 @@ process TRIM_GALORE {
         --quality 20 \
         --max_length 40 \
         $reads
-    """/home/ilyass09/env.yml
+    """
 }
 
 process FASTQC_POST {
