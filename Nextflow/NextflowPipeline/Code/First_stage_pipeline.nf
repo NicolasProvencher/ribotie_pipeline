@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl = 2
 
-params.input = "/home/machinegun/output/**/SRR*/*.fastq"
+params.input = "/home/ilyass09/output/**/SRR*/*.fastq"
 params.outdir = "pipeline_output"
 
 def input_files = Channel
