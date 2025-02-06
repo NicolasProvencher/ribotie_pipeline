@@ -1,8 +1,8 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl = 2
 
-params.input = "/home/ilyass09/output/**/SRR*/*.fastq"
-params.outdir = "pipeline_output"
+params.input = "/project/def-xroucou/riboseq_pipeline/output/**/SRR*/*.fastq"
+params.outdir = "/project/def-xroucou/riboseq_pipeline/pipeline_output_complet"
 
 def input_files = Channel
     .fromPath(params.input)
