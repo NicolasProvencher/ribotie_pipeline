@@ -44,7 +44,7 @@ process FASTQ_DUMP {
 
         """
         module load sra-toolkit
-        fasterq-dump --split-files ${gsm}
+        fasterq-dump  ${gsm}
         """
     
 }
