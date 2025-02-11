@@ -83,6 +83,8 @@ def create_initial_channels() {
 
 process FASTQ_DUMP {
     maxRetries params.max_retries
+    maxForks 10  // Limit parallel execution to 5 concurrent jobs
+
     publishDir "${params.outdir}/${gse}_${drug}_${bio}/${gsm}", mode: 'copy'
 
     input:
@@ -105,7 +107,7 @@ process FASTQ_DUMP {
 process FASTQC_PRE {
     tag "$gsm"
     publishDir "${params.outdir}/${gse}_${drug}_${bio}/${gsm}/fastqc_pre", mode: 'copy'
-    errorStrategy 'ignore'
+    // errorStrategy 'ignore'
 
     input:
     tuple val(gse), val(gsm), val(drug), val(bio), val(trim), val(sp), path(reads)
