@@ -133,7 +133,7 @@ process FASTQC_PRE {
 // Process TRIM_GALORE_SINGLE pour les fichiers single-end
 process TRIM_GALORE_SINGLE {
     tag "$gsm"
-    publishDir "${params.outdir}/${gse}/${gsm}/trimmed", mode: 'copy'
+    publishDir "${params.outdir}/${gse}_${drug}_${bio}/${gsm}/trimmed", mode: 'copy'
     errorStrategy 'ignore'
 
     input:
@@ -163,7 +163,7 @@ process TRIM_GALORE_SINGLE {
 // Process TRIM_GALORE_PAIRED pour les fichiers paired-end
 process TRIM_GALORE_PAIRED {
     tag "$gsm"
-    publishDir "${params.outdir}/${gse}/${gsm}/trimmed", mode: 'copy'
+    publishDir "${params.outdir}/${gse}_${drug}_${bio}/${gsm}/trimmed", mode: 'copy'
     errorStrategy 'ignore'
 
     input:
@@ -172,8 +172,6 @@ process TRIM_GALORE_PAIRED {
     output:
     tuple val(gse), val(gsm), val(drug), val(bio), val(trim), val(sp), path("*_val_*.fq"), emit: trimmed
     path "*_trimming_report.txt"
-
-
 
     script:
     """
@@ -192,7 +190,7 @@ process TRIM_GALORE_PAIRED {
 
 process FASTQC_POST {
     tag "$gsm"
-    publishDir "${params.outdir}/${gse}_${drug}_${bio}/${gsm}/fastqc_pre", mode: 'copy'
+    publishDir "${params.outdir}/${gse}_${drug}_${bio}/${gsm}/fastqc_post", mode: 'copy'
     errorStrategy 'ignore'
 
     input:
@@ -242,7 +240,7 @@ workflow {
             tuple(gse, gsm, drug, bio, trim, sp, fastqFiles)
         }
     
-    // Reste du workflow inchangé...
+
     def combined_fastq_files = FASTQ_DUMP.out.fastq_files.mix(existing_fastq_files)
     
     combined_fastq_files
