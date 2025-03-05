@@ -5,14 +5,10 @@
 
 nextflow.enable.dsl = 2
 params.max_retries = 3
-// le dossier output_complet est le resultat de premier stage
-params.input_fastq = '/home/ilyass09/scratch/riboseq_pipeline/output_complet_HS_1'
-params.input_csv = '/home/ilyass09/scratch/riboseq_pipeline/Samples_sheet/Sample_sheet_test.csv'
-params.outdir = '/home/ilyass09/scratch/riboseq_pipeline/Second_Stage_HS_Single'
-params.outdir_parent = '/home/ilyass09/scratch/riboseq_pipeline'
+
 // Fonctions de vérification pour chaque type de fichier
 def checkFastqExists(gse, gsm, drug, bio, sp) {
-    def outputPath = "${params.input_fastq}/${gse}_${drug}_${bio}/${gsm}"
+    def outputPath = "${params.input_output_fastq_second_stage}/${gse}_${drug}_${bio}/${gsm}"
     if (sp.toLowerCase() == "paired") {
         def file1 = new File("${outputPath}/${gsm}_1.fastq")
         def file2 = new File("${outputPath}/${gsm}_2.fastq")
@@ -124,7 +120,7 @@ process BOWTIE_INDEX {
     beforeScript 'module load bowtie2'  
     maxRetries params.max_retries
     tag "$type"
-    publishDir "${params.outdir_parent}/index_bowtie/${type}", mode: 'copy'
+    publishDir "${params.outdir_stage_stage_parent}/index_bowtie/${type}", mode: 'copy'
 
     input:
     tuple val(type), path(fasta_file)
@@ -153,7 +149,7 @@ process STAR_INDEX {
     beforeScript 'module load star'  
     maxRetries params.max_retries
     tag "$type"
-    publishDir "${params.outdir_parent}/index_STAR", mode: 'copy'
+    publishDir "${params.outdir_stage_stage_parent}/index_STAR", mode: 'copy'
 
     input:
     tuple val(type), val(gtf), path(fasta_file)
@@ -183,7 +179,7 @@ process BOWTIE_SINGLE {
     beforeScript 'module load bowtie2'  
     maxRetries params.max_retries
     tag "${gsm}"
-    publishDir "${params.outdir}/bowtie/${gse}_${drug}_${bio}/${gsm}", mode: 'copy'
+    publishDir "${params.outdir_stage_stage}/bowtie/${gse}_${drug}_${bio}/${gsm}", mode: 'copy'
        
     input:
     tuple val(type), val(gse), val(gsm), val(drug), val(bio), val(sp), path(fastq_file), path(bowtie_indexes)
@@ -223,7 +219,7 @@ process BOWTIE_PAIRED {
     beforeScript 'module load bowtie2'  
     maxRetries params.max_retries
     tag "${gsm}"
-    publishDir "${params.outdir}/bowtie/${gse}_${drug}_${bio}/${gsm}", mode: 'copy'
+    publishDir "${params.outdir_stage_stage}/bowtie/${gse}_${drug}_${bio}/${gsm}", mode: 'copy'
        
     input:
     tuple val(type), val(gse), val(gsm), val(drug), val(bio), val(sp), path(fastq_file_1), path(fastq_file_2), path(bowtie_indexes)
@@ -256,7 +252,7 @@ process STAR_SINGLE {
     beforeScript 'module load star'  
     maxRetries params.max_retries
     tag "${gsm}"
-    publishDir "${params.outdir}/STAR/${gse}_${drug}_${bio}/${gsm}", mode: 'copy'
+    publishDir "${params.outdir_stage_stage}/STAR/${gse}_${drug}_${bio}/${gsm}", mode: 'copy'
        
     input:
     tuple val(type), val(gse), val(gsm), val(drug), val(bio), path(unmapped_fq), path(star_indexes)
@@ -303,7 +299,7 @@ process STAR_PAIRED {
     beforeScript 'module load star'  
     maxRetries params.max_retries
     tag "${gsm}"
-    publishDir "${params.outdir}/STAR/${gse}_${drug}_${bio}/${gsm}", mode: 'copy'
+    publishDir "${params.outdir_stage_stage}/STAR/${gse}_${drug}_${bio}/${gsm}", mode: 'copy'
        
     input:
     tuple val(type), val(gse), val(gsm), val(drug), val(bio), path(unmapped_fq), path(star_indexes)
@@ -365,7 +361,8 @@ workflow {
             checkFastqExists(it[0], it[1], it[2], it[3], it[5])
         }
         .map { gse, gsm, drug, bio, trim, sp, type ->
-            def outputPath = "${params.input_fastq}/${gse}_${drug}_${bio}/${gsm}/trimmed"
+            def outputPath = "${params.input_output_fastq_second_stage
+        }/${gse}_${drug}_${bio}/${gsm}/trimmed"
             if (sp.toLowerCase() == "paired") {
                 def fastq1 = file("${outputPath}/${gsm}_1_val_1.fq") // a modifier a /${gsm}_1_trimmed.fq donc il faut adaper le premier stage
                 def fastq2 = file("${outputPath}/${gsm}_2_val_2.fq")
@@ -511,13 +508,13 @@ workflow.onComplete {
     def transcriptome_count = 0
     
     // Vérifier les fichiers de sortie Bowtie
-    def bowtie_dir = new File("${params.outdir}/bowtie")
+    def bowtie_dir = new File("${params.outdir_stage_stage}/bowtie")
     if (bowtie_dir.exists()) {
         bowtie_count = bowtie_dir.listFiles().findAll { it.isDirectory() }.size()
     }
     
     // Vérifier les fichiers de sortie STAR
-    def star_dir = new File("${params.outdir}/STAR")
+    def star_dir = new File("${params.outdir_stage_stage}/STAR")
     if (star_dir.exists()) {
         star_count = star_dir.listFiles().findAll { it.isDirectory() }.size()
         
@@ -545,6 +542,6 @@ workflow.onComplete {
     STAR alignment completed: $star_count échantillons
     Transcriptome alignments: $transcriptome_count fichiers
     
-    Output directory: ${params.outdir}
+    Output directory: ${params.outdir_stage_stage}
     """
 }
