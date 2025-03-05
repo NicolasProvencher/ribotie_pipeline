@@ -2,7 +2,7 @@
 nextflow.enable.dsl = 2
 
 params.max_retries = 3
-params.outdir = '/project/def-xroucou/riboseq_pipeline/output_complet'
+params.outdir = '/home/ilyass09/scratch/riboseq_pipeline/output_complet'
 
 // Fonctions de vérification pour chaque type de fichier
 def checkFastqExists(gse, gsm, drug, bio, sp) {
@@ -57,7 +57,7 @@ def checkFastqcPostExists(gse, gsm, drug, bio, sp) {
 
 def create_initial_channels() {
     def csvChannelPerLigne = Channel
-        .fromPath('/home/ilyass09/Sample_Sheet.1.2.csv')
+        .fromPath('/home/ilyass09/scratch/riboseq_pipeline/Samples_sheet/Sample_sheet_test.csv')
         .splitCsv(header: true)
         .map { row -> tuple(
             row.Study_accession,
@@ -83,10 +83,10 @@ def create_initial_channels() {
 
 process FASTQ_DUMP {
 
-    beforeScript 'module load sra-toolkit'  // Ajouter cette ligne
+    beforeScript 'module load sra-toolkit'  
 
     maxRetries params.max_retries
-    maxForks 1  // Limit parallel execution to 5 concurrent jobs
+    // maxForks 1  // Limit parallel execution to 5 concurrent jobs
     tag "$gsm"
     publishDir "${params.outdir}/${gse}_${drug}_${bio}/${gsm}", mode: 'copy'
 
@@ -109,7 +109,7 @@ process FASTQ_DUMP {
 process FASTQC_PRE {
     tag "$gsm"
     publishDir "${params.outdir}/${gse}_${drug}_${bio}/${gsm}/fastqc_pre", mode: 'copy'
-    // errorStrategy 'ignore'
+    errorStrategy 'ignore'
 
     input:
     tuple val(gse), val(gsm), val(drug), val(bio), val(trim), val(sp), path(reads)
@@ -122,10 +122,10 @@ process FASTQC_PRE {
     script:
     if (sp.toLowerCase() == "paired") {
         """
-        echo "[INFO] FASTQC_PRE : Starting download of GSM: ${gsm}"
+        echo "[INFO] FASTQC_PRE : Starting fastqc of GSM: ${gsm}"
         fastqc --quiet ${reads[0]}
         fastqc --quiet ${reads[1]}
-        echo "[SUCCESS] FASTQC_PRE : Downloaded GSM: ${gsm}"
+        echo "[SUCCESS] FASTQC_PRE : fastqc GSM: ${gsm}"
         """
     } else {
         """
@@ -174,7 +174,7 @@ process TRIM_GALORE_PAIRED {
     tuple val(gse), val(gsm), val(drug), val(bio), val(trim), val(sp), path(reads)
 
     output:
-    tuple val(gse), val(gsm), val(drug), val(bio), val(trim), val(sp), path("*_val_*.fq"), emit: trimmed
+    tuple val(gse), val(gsm), val(drug), val(bio), val(trim), val(sp), path("*_val_*.fq"), emit: trimmed // a modifier a _val_trimmed.fq
     path "*_trimming_report.txt"
 
     script:
