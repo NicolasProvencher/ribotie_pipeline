@@ -6,9 +6,9 @@
 nextflow.enable.dsl = 2
 params.max_retries = 3
 // le dossier output_complet est le resultat de premier stage
-params.input_fastq = '/home/ilyass09/scratch/riboseq_pipeline/output_complet_1'
+params.input_fastq = '/home/ilyass09/scratch/riboseq_pipeline/output_complet_HS_1'
 params.input_csv = '/home/ilyass09/scratch/riboseq_pipeline/Samples_sheet/Sample_sheet_test.csv'
-params.outdir = '/home/ilyass09/scratch/riboseq_pipeline/output_complet_second_stage'
+params.outdir = '/home/ilyass09/scratch/riboseq_pipeline/Second_Stage_HS_Single'
 params.outdir_parent = '/home/ilyass09/scratch/riboseq_pipeline'
 // Fonctions de vérification pour chaque type de fichier
 def checkFastqExists(gse, gsm, drug, bio, sp) {
@@ -22,6 +22,7 @@ def checkFastqExists(gse, gsm, drug, bio, sp) {
         return file.exists()
     }
 }
+
 // Définition de la fonction pour créer les channels
 def create_initial_channels() {
     def csvChannelPerLigne = Channel
@@ -179,7 +180,6 @@ process BOWTIE_SINGLE {
     cpus 10
     memory '20 GB'
     time '3h'
-    // maxForks 1  // Limit parallel execution to 5 concurrent jobs
     beforeScript 'module load bowtie2'  
     maxRetries params.max_retries
     tag "${gsm}"
@@ -219,7 +219,6 @@ process BOWTIE_PAIRED {
     cpus 20
     memory '50 GB'
     time '3h'
-    // maxForks 1  // Limit parallel execution to 5 concurrent jobs
     stageInMode 'copy'  // Forcer la copie des fichiers plutôt que des liens symboliques
     beforeScript 'module load bowtie2'  
     maxRetries params.max_retries
@@ -254,7 +253,6 @@ process STAR_SINGLE {
     cpus 10
     memory '40 GB'
     time '3h'
-    maxForks 15  // Limit parallel execution to 5 concurrent jobs
     beforeScript 'module load star'  
     maxRetries params.max_retries
     tag "${gsm}"
@@ -303,7 +301,6 @@ process STAR_PAIRED {
     memory '70 GB'
     time '6h' 
     beforeScript 'module load star'  
-    maxForks 10  // Limit parallel execution to 5 concurrent jobs
     maxRetries params.max_retries
     tag "${gsm}"
     publishDir "${params.outdir}/STAR/${gse}_${drug}_${bio}/${gsm}", mode: 'copy'
@@ -368,7 +365,7 @@ workflow {
             checkFastqExists(it[0], it[1], it[2], it[3], it[5])
         }
         .map { gse, gsm, drug, bio, trim, sp, type ->
-            def outputPath = "gd${params.input_fastq}/${gse}_${drug}_${bio}/${gsm}/trimmed"
+            def outputPath = "${params.input_fastq}/${gse}_${drug}_${bio}/${gsm}/trimmed"
             if (sp.toLowerCase() == "paired") {
                 def fastq1 = file("${outputPath}/${gsm}_1_val_1.fq") // a modifier a /${gsm}_1_trimmed.fq donc il faut adaper le premier stage
                 def fastq2 = file("${outputPath}/${gsm}_2_val_2.fq")
