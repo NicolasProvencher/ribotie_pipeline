@@ -2,11 +2,10 @@
 nextflow.enable.dsl = 2
 
 params.max_retries = 3
-params.outdir = '/home/ilyass09/scratch/riboseq_pipeline/output_complet'
 
 // Fonctions de vérification pour chaque type de fichier
 def checkFastqExists(gse, gsm, drug, bio, sp) {
-    def outputPath = "${params.outdir}/${gse}_${drug}_${bio}/${gsm}"
+    def outputPath = "${params.outdir_first_stage}/${gse}_${drug}_${bio}/${gsm}"
     if (sp.toLowerCase() == "paired") {
         def file1 = new File("${outputPath}/${gsm}_1.fastq")
         def file2 = new File("${outputPath}/${gsm}_2.fastq")
@@ -18,7 +17,7 @@ def checkFastqExists(gse, gsm, drug, bio, sp) {
 }
 
 def checkFastqcPreExists(gse, gsm, drug, bio, sp) {
-    def outputPath = "${params.outdir}/${gse}_${drug}_${bio}/${gsm}/fastqc_pre"
+    def outputPath = "${params.outdir_first_stage}/${gse}_${drug}_${bio}/${gsm}/fastqc_pre"
     if (sp.toLowerCase() == "paired") {
         return new File("${outputPath}/${gsm}_1_fastqc.html").exists() &&
                new File("${outputPath}/${gsm}_2_fastqc.html").exists() &&
@@ -31,7 +30,7 @@ def checkFastqcPreExists(gse, gsm, drug, bio, sp) {
 }
 
 def checkTrimExists(gse, gsm, drug, bio, sp) {
-    def outputPath = "${params.outdir}/${gse}/${gsm}/trimmed"
+    def outputPath = "${params.outdir_first_stage}/${gse}/${gsm}/trimmed"
     if (sp.toLowerCase() == "paired") {
         return new File("${outputPath}/${gsm}_1_val_1.fq").exists() &&
                new File("${outputPath}/${gsm}_2_val_2.fq").exists()
@@ -41,7 +40,7 @@ def checkTrimExists(gse, gsm, drug, bio, sp) {
 }
 
 def checkFastqcPostExists(gse, gsm, drug, bio, sp) {
-    def outputPath = "${params.outdir}/${gse}_${drug}_${bio}/${gsm}/fastqc_pre"
+    def outputPath = "${params.outdir_first_stage}/${gse}_${drug}_${bio}/${gsm}/fastqc_pre"
     if (sp.toLowerCase() == "paired") {
         return new File("${outputPath}/${gsm}_1_val_1_fastqc.html").exists() &&
                new File("${outputPath}/${gsm}_2_val_2_fastqc.html").exists() &&
@@ -57,7 +56,7 @@ def checkFastqcPostExists(gse, gsm, drug, bio, sp) {
 
 def create_initial_channels() {
     def csvChannelPerLigne = Channel
-        .fromPath('/home/ilyass09/scratch/riboseq_pipeline/Samples_sheet/Sample_sheet_test.csv')
+        .fromPath(params.input_csv)
         .splitCsv(header: true)
         .map { row -> tuple(
             row.Study_accession,
@@ -88,7 +87,7 @@ process FASTQ_DUMP {
     maxRetries params.max_retries
     // maxForks 1  // Limit parallel execution to 5 concurrent jobs
     tag "$gsm"
-    publishDir "${params.outdir}/${gse}_${drug}_${bio}/${gsm}", mode: 'copy'
+    publishDir "${params.outdir_first_stage}/${gse}_${drug}_${bio}/${gsm}", mode: 'copy'
 
     input:
     tuple val(gse), val(gsm), val(drug), val(bio), val(trim), val(sp)
@@ -108,7 +107,7 @@ process FASTQ_DUMP {
 
 process FASTQC_PRE {
     tag "$gsm"
-    publishDir "${params.outdir}/${gse}_${drug}_${bio}/${gsm}/fastqc_pre", mode: 'copy'
+    publishDir "${params.outdir_first_stage}/${gse}_${drug}_${bio}/${gsm}/fastqc_pre", mode: 'copy'
     errorStrategy 'ignore'
 
     input:
@@ -137,7 +136,7 @@ process FASTQC_PRE {
 // Process TRIM_GALORE_SINGLE pour les fichiers single-end
 process TRIM_GALORE_SINGLE {
     tag "$gsm"
-    publishDir "${params.outdir}/${gse}_${drug}_${bio}/${gsm}/trimmed", mode: 'copy'
+    publishDir "${params.outdir_first_stage}/${gse}_${drug}_${bio}/${gsm}/trimmed", mode: 'copy'
     errorStrategy 'ignore'
 
     input:
@@ -167,7 +166,7 @@ process TRIM_GALORE_SINGLE {
 // Process TRIM_GALORE_PAIRED pour les fichiers paired-end
 process TRIM_GALORE_PAIRED {
     tag "$gsm"
-    publishDir "${params.outdir}/${gse}_${drug}_${bio}/${gsm}/trimmed", mode: 'copy'
+    publishDir "${params.outdir_first_stage}/${gse}_${drug}_${bio}/${gsm}/trimmed", mode: 'copy'
     errorStrategy 'ignore'
 
     input:
@@ -194,7 +193,7 @@ process TRIM_GALORE_PAIRED {
 
 process FASTQC_POST {
     tag "$gsm"
-    publishDir "${params.outdir}/${gse}_${drug}_${bio}/${gsm}/fastqc_post", mode: 'copy'
+    publishDir "${params.outdir_first_stage}/${gse}_${drug}_${bio}/${gsm}/fastqc_post", mode: 'copy'
     errorStrategy 'ignore'
 
     input:
@@ -237,7 +236,7 @@ workflow {
             checkFastqExists(gse, gsm, drug, bio, sp)
         }
         .map { gse, gsm, drug, bio, trim, sp ->
-            def outputPath = "${params.outdir}/${gse}_${drug}_${bio}/${gsm}"
+            def outputPath = "${params.outdir_first_stage}/${gse}_${drug}_${bio}/${gsm}"
             def fastqFiles = sp.toLowerCase() == "paired" ?
                 [file("${outputPath}/${gsm}_1.fastq"), file("${outputPath}/${gsm}_2.fastq")] :
                 file("${outputPath}/${gsm}.fastq")
