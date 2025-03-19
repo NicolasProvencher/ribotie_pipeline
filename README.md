@@ -2,19 +2,21 @@
 
 Ce dépôt contient un ensemble de workflows Nextflow conçus pour l'analyse complète des données de séquençage de ribosome profiling, de l'acquisition des données brutes jusqu'aux analyses d'expression différentielle.
 
-## Structure du pipeline
-
-Le pipeline se compose de trois étapes principales :
 
 ## Configuration pour environnements HPC
 
 Le pipeline est optimisé pour fonctionner sur des clusters HPC utilisant Slurm comme gestionnaire de ressources:
 
+## Structure du pipeline
+
+Le pipeline se compose de trois étapes principales :
+
+
 - **Première étape et deuxième étape**: Utilisation de conda pour la gestion des dépendances
   ```bash
   # Activation de l'environnement conda
   conda activate nextflow_env
-  
+
 1. **Première étape** : Acquisition et prétraitement des données
    - Téléchargement des fichiers FASTQ à partir de GSM/GSE
    - Contrôle qualité avec FastQC (pré-traitement)
