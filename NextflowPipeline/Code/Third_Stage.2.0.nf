@@ -272,7 +272,7 @@ workflow {
     
     // Afficher les résultats
     RUN_RIBOTIE_DATA.out.ribotie_results_data.view { gse, drug, bio, result_files ->
-        return "RiboTIE completed for GSE: $gse, Drug: $drug, Bio: $bio"
+        return "RiboTIE --data completed for GSE: $gse, Drug: $drug, Bio: $bio"
     }
     RUN_RIBOTIE(csv_files.ribotie_results_data)
     // Afficher les résultats
