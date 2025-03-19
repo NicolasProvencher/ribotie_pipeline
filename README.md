@@ -23,13 +23,24 @@ Le pipeline se compose de trois étapes principales :
    - Préparation des données avec `ribotie --data`
    - Analyse complète avec l'algorithme RiboTIE
 
-## Caractéristiques
+## Format du fichier CSV d'entrée
 
-- Support pour plusieurs espèces (humain, souris, drosophile, C. elegans, etc.)
-- Traitement parallélisé pour une exécution efficace
-- Vérification automatique des fichiers intermédiaires pour éviter les redondances
-- Compatibilité avec les données single-end et paired-end
-- Intégration optimisée pour les systèmes HPC avec Slurm
+Le pipeline utilise un fichier CSV structuré contenant les métadonnées des échantillons à analyser. Voici les colonnes requises :
+
+| Colonne | Description |
+|---------|-------------|
+| Name | Nom de l'étude ou de l'auteur |
+| Species | Espèce biologique (ex: HS pour Homo sapiens) |
+| Study_accession | Identifiant GSE de l'étude |
+| Project_link | Lien vers la page GEO de l'étude |
+| PMID | Identifiant PubMed de la publication associée |
+| Treatment_type | Type de traitement (pre-lysis, post-lysis) |
+| Drug | Médicament utilisé (ex: cycloheximide) |
+| Sample_accession | Identifiants GSM des échantillons, séparés par des points-virgules |
+| Biological_type | Type biologique de l'échantillon (ex: Cells_A549, HAEC) |
+| Ribo_type | Type de ribosome (monosome, polysome) |
+| Trim_arg | Arguments additionnels pour Trim Galore (optionnel) |
+| S_P_type | Type de séquençage (single ou paired) |
 
 ## Installation et configuration
 
@@ -42,20 +53,33 @@ Le pipeline se compose de trois étapes principales :
 2. Avant d'exécuter le pipeline, vous devez :
    - Faire un `git pull` pour obtenir les dernières mises à jour
    - Modifier les chemins dans le fichier de configuration (`nextflow.config`) pour les adapter à votre environnement
-   - Configurer les chemins vers vos fichiers de référence (FASTA, GTF) et répertoires de sortie
 
-## Structure des fichiers
+## Chemins à modifier dans le fichier de configuration
 
-Le pipeline est organisé en plusieurs scripts Nextflow :
-- `First_stage_pipeline.nf` : Acquisition et prétraitement des données
-- `MultiQc.nf` : Génération des rapports qualité par GSE
-- `MultiQc_Rapport_Management.nf` : Centralisation des rapports MultiQC (optionnel)
-- `Second_Stage.3.1.nf` : Alignement et filtrage des séquences
-- `Third_Stage.2.0.nf` : Analyse RiboTIE pour l'identification des sites d'initiation
+Vous devez modifier les chemins suivants dans le fichier `nextflow.config` pour les adapter à votre environnement :
+
+1. **Chemins des fichiers de référence** :
+   - `params.path_fasta_HS_B` : Fichier FASTA pour filtrage Bowtie (ARNs non-codants humains)
+   - `params.path_fasta_HS` : Génome de référence humain (FASTA)
+   - `params.path_fasta_HS_GTF` : Annotation du génome humain (GTF)
+
+2. **Chemins des répertoires de sortie** :
+   - `params.outdir_first_stage` : Répertoire de sortie pour la première étape
+   - `params.input_output_fastq_second_stage` : Répertoire contenant les fichiers FASTQ traités
+   - `params.outdir_stage_stage` : Répertoire de sortie pour la deuxième étape
+   - `params.outdir_stage_stage_parent` : Répertoire parent pour les index
+   - `params.outdir_ribotie` : Répertoire de sortie pour RiboTIE
+
+3. **Chemins des fichiers d'entrée** :
+   - `params.input_csv` : Fichier CSV contenant les métadonnées des échantillons
+   - `params.multiqc_config` : Fichier de configuration pour MultiQC
+   - `params.star_dir` : Répertoire contenant les résultats STAR
+   - `params.ribotie_dir` : Répertoire d'installation de RiboTIE
+
+4. **Options de cluster** :
+   - `process.clusterOptions` : Modifier l'option `--account=rrg-xroucou` selon votre compte sur le cluster
 
 ## Utilisation
-
-Le pipeline est configuré pour fonctionner avec un fichier CSV d'entrée contenant les métadonnées des échantillons (accessions GEO, type de traitement, paramètres de nettoyage, etc.).
 
 Pour exécuter le pipeline complet, suivez ces étapes :
 
@@ -64,9 +88,9 @@ Pour exécuter le pipeline complet, suivez ces étapes :
    nextflow run First_stage_pipeline.nf --input_csv samples.csv
    ```
 
-2. Génération des rapports qualité MultiQC :
+2. Génération des rapports qualité MultiQC (en utilisant le fichier de config) :
    ```bash
-   nextflow run MultiQc.nf
+   nextflow run MultiQc.nf -c my_config.yaml
    ```
 
 3. (Optionnel) Centralisation des rapports MultiQC :
@@ -76,7 +100,7 @@ Pour exécuter le pipeline complet, suivez ces étapes :
 
 4. Exécution de la deuxième étape (alignement) :
    ```bash
-   nextflow run Second_Stage.3.1.nf -profile slurm
+   nextflow run Second_Stage.3.1.nf -profile beluga
    ```
 
 5. Exécution de l'analyse RiboTIE :
