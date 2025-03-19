@@ -1,5 +1,6 @@
 #!/usr/bin/env nextflow
-// TODO: rendre le code generale
+// TODO: rendre le code generale pour tous les types cellulaires
+
 nextflow.enable.dsl = 2
 // TODO: Deja present dans le fichier config 
 // Paramètres spécifiques pour RiboTIE
