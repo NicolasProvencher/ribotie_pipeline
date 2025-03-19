@@ -1,15 +1,15 @@
 #!/usr/bin/env nextflow
 
-// DSL version
 nextflow.enable.dsl = 2
-
+// TODO: Deja present dans le fichier config 
 // Paramètres spécifiques pour RiboTIE
-params.star_dir = '/home/ilyass09/scratch/riboseq_pipeline/Second_Stage_copy/HS/STAR'
-params.input_csv = '/home/ilyass09/scratch/riboseq_pipeline/Samples_sheet/test.csv'
-params.outdir_ribotie = '/home/ilyass09/scratch/riboseq_pipeline/Ribotie_complet'
-params.ribotie_dir = '/home/ilyass09/scratch/riboseq_pipeline/ribotie'
-params.max_retries = 2
-params.ignore_ribotie_errors = true
+// params.star_dir = '/home/ilyass09/scratch/riboseq_pipeline/Second_Stage_copy/HS/STAR'
+// params.input_csv = '/home/ilyass09/scratch/riboseq_pipeline/Samples_sheet/test.csv'
+// params.outdir_ribotie = '/home/ilyass09/scratch/riboseq_pipeline/Ribotie_complet'
+// params.ribotie_dir = '/home/ilyass09/scratch/riboseq_pipeline/ribotie'
+// params.max_retries = 2
+// params.ignore_ribotie_errors = true
+
 
 // Fonctions auxiliaires pour obtenir les chemins des fichiers
 def getFastaPath(type) {
