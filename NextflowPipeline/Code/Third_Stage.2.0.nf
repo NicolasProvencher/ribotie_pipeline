@@ -1,5 +1,5 @@
 #!/usr/bin/env nextflow
-
+// TODO: rendre le code generale
 nextflow.enable.dsl = 2
 // TODO: Deja present dans le fichier config 
 // Paramètres spécifiques pour RiboTIE
