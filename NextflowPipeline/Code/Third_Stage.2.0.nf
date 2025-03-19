@@ -176,7 +176,7 @@ process RUN_RIBOTIE_DATA {
     
     // Publish results
     publishDir "${params.outdir_ribotie}/${gse}_${drug}_${bio}/results_data", mode: 'copy'
-    // errorStrategy { params.ignore_ribotie_errors ? 'ignore' : 'retry' }
+    errorStrategy { params.ignore_ribotie_errors ? 'ignore' : 'retry' }
     
     input:
     tuple val(gse), val(drug), val(bio), path(yaml_file)
@@ -209,7 +209,7 @@ process RUN_RIBOTIE {
     clusterOptions = '--account=def-xroucou --gres=gpu:1'
      // Publish results
     publishDir "${params.outdir_ribotie}/${gse}_${drug}_${bio}/results_run", mode: 'copy'
-    // errorStrategy { params.ignore_ribotie_errors ? 'ignore' : 'retry' }
+    errorStrategy { params.ignore_ribotie_errors ? 'ignore' : 'retry' }
      
     input:
     tuple val(gse), val(drug), val(bio), path(yaml_file)
