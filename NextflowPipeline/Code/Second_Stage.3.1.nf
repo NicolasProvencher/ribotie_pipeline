@@ -5,16 +5,20 @@
 
 nextflow.enable.dsl = 2
 params.max_retries = 3
-
+// le dossier output_complet est le resultat de premier stage
+params.input_output_fastq_second_stage = '/home/ilyass09/scratch/riboseq_pipeline/Etape_final_trimmed/HS'
+params.input_csv_test = '/home/ilyass09/scratch/riboseq_pipeline/Samples_sheet/Samples_sheet_final.csv'
+params.outdir_stage_stage = '/home/ilyass09/scratch/riboseq_pipeline/Second_Stage_HS_final_2'
+params.outdir_stage_stage_parent = '/home/ilyass09/scratch/riboseq_pipeline'
 // Fonctions de vérification pour chaque type de fichier
 def checkFastqExists(gse, gsm, drug, bio, sp) {
-    def outputPath = "${params.input_output_fastq_second_stage}/${gse}_${drug}_${bio}/${gsm}"
+    def outputPath = "${params.input_output_fastq_second_stage}/${gse}_${drug}_${bio}/${gsm}/trimmed"
     if (sp.toLowerCase() == "paired") {
-        def file1 = new File("${outputPath}/${gsm}_1.fastq")
-        def file2 = new File("${outputPath}/${gsm}_2.fastq")
+        def file1 = new File("${outputPath}/${gsm}_1_val_1.fq")
+        def file2 = new File("${outputPath}/${gsm}_2_val_2.fq")
         return file1.exists() && file2.exists()
     } else {
-        def file = new File("${outputPath}/${gsm}.fastq")
+        def file = new File("${outputPath}/${gsm}_trimmed.fq")
         return file.exists()
     }
 }
@@ -22,7 +26,7 @@ def checkFastqExists(gse, gsm, drug, bio, sp) {
 // Définition de la fonction pour créer les channels
 def create_initial_channels() {
     def csvChannelPerLigne = Channel
-        .fromPath(params.input_csv)
+        .fromPath(params.input_csv_test)
         .splitCsv(header: true)
         .map { row -> tuple(
             row.Study_accession,
@@ -114,7 +118,7 @@ def checkGtfExists(path) {
 }
 
 process BOWTIE_INDEX {
-    cpus 5
+    cpus 1
     memory '5 GB'
     time '1h'    
     beforeScript 'module load bowtie2'  
@@ -143,9 +147,9 @@ process BOWTIE_INDEX {
 }
 
 process STAR_INDEX {
-    cpus 30
+    cpus 5
     memory '40 GB'
-    time '3h'
+    time '12h'
     beforeScript 'module load star'  
     maxRetries params.max_retries
     tag "$type"
@@ -161,7 +165,7 @@ process STAR_INDEX {
     """
     echo "Indexation STAR pour ${type} avec le fichier ${fasta_file} et GTF ${gtf}"
     mkdir -p ${type}_star_index
-    STAR --runThreadN 30 \
+    STAR --runThreadN 5\
      --genomeDir ${type}_star_index \
      --runMode genomeGenerate \
      --genomeFastaFiles ${fasta_file} \
@@ -173,11 +177,13 @@ process STAR_INDEX {
 
 // Définition du process bowtie_single
 process BOWTIE_SINGLE {
-    cpus 10
-    memory '20 GB'
-    time '3h'
+    cpus 5
+    memory '25 GB'
+    time '12h'
     beforeScript 'module load bowtie2'  
-    maxRetries params.max_retries
+    // Tentative maximale de 3    
+    // Stratégie dynamique: retry jusqu'à la 3ème tentative, puis ignore
+    errorStrategy 'ignore'     
     tag "${gsm}"
     publishDir "${params.outdir_stage_stage}/bowtie/${gse}_${drug}_${bio}/${gsm}", mode: 'copy'
        
@@ -203,7 +209,7 @@ process BOWTIE_SINGLE {
     # Exécuter Bowtie2 avec les paramètres pour single-end et rediriger vers /dev/null
     # puisque nous ne sommes intéressés que par les lectures non mappées
     bowtie2 \
-        -p 10 \
+        -p 5 \
         -x ${index_prefix} \
         -U \$FASTQ \
         --un ${gsm}_unmapped.fq \
@@ -212,12 +218,16 @@ process BOWTIE_SINGLE {
 }
 
 process BOWTIE_PAIRED {
-    cpus 20
+    cpus 10
     memory '50 GB'
     time '3h'
     stageInMode 'copy'  // Forcer la copie des fichiers plutôt que des liens symboliques
     beforeScript 'module load bowtie2'  
-    maxRetries params.max_retries
+    // Tentative maximale de 3
+    maxRetries 3
+    
+    // Stratégie dynamique: retry jusqu'à la 3ème tentative, puis ignore
+    errorStrategy { task.attempt <= 3 ? 'retry' : 'ignore' }    
     tag "${gsm}"
     publishDir "${params.outdir_stage_stage}/bowtie/${gse}_${drug}_${bio}/${gsm}", mode: 'copy'
        
@@ -234,7 +244,7 @@ process BOWTIE_PAIRED {
 
     """
     bowtie2 \
-        -p 20 \
+        -p 10 \
         -x ${index_prefix} \
         -1 ${fastq_file_1} \
         -2 ${fastq_file_2} \
@@ -246,11 +256,13 @@ process BOWTIE_PAIRED {
 
 // Mise à jour du process STAR_SINGLE
 process STAR_SINGLE {
-    cpus 10
-    memory '40 GB'
-    time '3h'
+    cpus 5
+    memory '60 GB'
+    time '12h'
     beforeScript 'module load star'  
-    maxRetries params.max_retries
+    // Tentative maximale de 3
+    errorStrategy 'ignore'     
+ 
     tag "${gsm}"
     publishDir "${params.outdir_stage_stage}/STAR/${gse}_${drug}_${bio}/${gsm}", mode: 'copy'
        
@@ -270,7 +282,7 @@ process STAR_SINGLE {
      # Déterminer le répertoire parent contenant les fichiers d'index
     INDEX_DIR=\$(dirname \$(readlink -f ${star_indexes[0]}))
     
-    STAR --runThreadN 10 \
+    STAR --runThreadN 5 \
          --genomeDir \$INDEX_DIR \
          --genomeLoad NoSharedMemory \
          --readFilesIn ${unmapped_fq} \
@@ -293,11 +305,15 @@ process STAR_SINGLE {
 
 // Mise à jour du process STAR_PAIRED
 process STAR_PAIRED {
-    cpus 20
+    cpus 5
     memory '70 GB'
     time '6h' 
     beforeScript 'module load star'  
-    maxRetries params.max_retries
+    // Tentative maximale de 3
+    maxRetries 3
+    
+    // Stratégie dynamique: retry jusqu'à la 3ème tentative, puis ignore
+    errorStrategy { task.attempt <= 3 ? 'retry' : 'ignore' }
     tag "${gsm}"
     publishDir "${params.outdir_stage_stage}/STAR/${gse}_${drug}_${bio}/${gsm}", mode: 'copy'
        
@@ -328,7 +344,7 @@ process STAR_PAIRED {
      # Déterminer le répertoire parent contenant les fichiers d'index
     INDEX_DIR=\$(dirname \$(readlink -f ${star_indexes[0]}))
     
-    STAR --runThreadN 10 \
+    STAR --runThreadN 5 \
          --genomeDir \$INDEX_DIR \
          --genomeLoad NoSharedMemory \
          --readFilesIn ${read1} ${read2} \
@@ -378,6 +394,9 @@ workflow {
         single: it[5].toLowerCase() == 'single'
         paired: it[5].toLowerCase() == 'paired'
     }
+
+    Channel.of(params.input_csv_test).view{ "Le path de csv: $it" }
+    Channel.of(params.input_output_fastq_second_stage).view{ "Le path des fichiers fastq: $it" }
 
     // Debug des channels d'entrée
     singleChannel.count().subscribe { count ->
