@@ -1,0 +1,289 @@
+#!/usr/bin/env nextflow
+nextflow.enable.dsl = 2
+//  Dans cette partie 
+// tous fonctionne bien mais j'ai besoin de verifier les multiQc pour que assurer que tout est bon genre le trim
+// Ce code est personnaliser pour les fichiers de nicolas qui sont dans un desordre 
+
+// Define parameters
+params.outdir_file_exist_already = "/home-vhost32/xroucou_group/analysis/openprot_2.0/ribo-seq/fastq"
+params.outdir = "/project/def-xroucou/riboseq_pipeline/Etape_final_trimmed"
+params.input_csv = "/project/def-xroucou/riboseq_pipeline/test_work_pipeline/Samples_sheet_final.csv"
+params.max_retries = 3
+
+// Function to check if files exist in the fastq directory
+def checkFastqExists(gsm, sp) {
+    def outputPath = "${params.outdir_file_exist_already}"
+    def found = false
+    
+    try {
+        def dir = new File(outputPath)
+        def files = dir.list()
+        
+        if (sp.toLowerCase() == "paired") {
+            def file1Exists = files.any { it == "${gsm}_1.fastq" }
+            def file2Exists = files.any { it == "${gsm}_2.fastq" }
+            found = file1Exists && file2Exists
+        } else {
+            found = files.any { it == "${gsm}.fastq" }
+        }
+    } catch (Exception e) {
+        log.error "Erreur lors de la vérification des fichiers pour GSM: $gsm - ${e.message}"
+    }
+    
+    return found
+}
+
+// Fonctions de vérification pour les étapes post-téléchargement
+def checkFastqcPreExists(gse, gsm, drug, bio, sp) {
+    def outputPath = "${params.outdir}/${gse}_${drug}_${bio}/${gsm}/fastqc_pre"
+    if (sp.toLowerCase() == "paired") {
+        return new File("${outputPath}/${gsm}_1_fastqc.html").exists() &&
+               new File("${outputPath}/${gsm}_2_fastqc.html").exists() &&
+               new File("${outputPath}/${gsm}_1_fastqc.zip").exists() &&
+               new File("${outputPath}/${gsm}_2_fastqc.zip").exists()
+    } else {
+        return new File("${outputPath}/${gsm}_fastqc.html").exists() &&
+               new File("${outputPath}/${gsm}_fastqc.zip").exists()
+    }
+}
+
+def checkTrimExists(gse, gsm, drug, bio, sp) {
+    def outputPath = "${params.outdir}/${gse}_${drug}_${bio}/${gsm}/trimmed"
+    if (sp.toLowerCase() == "paired") {
+        return new File("${outputPath}/${gsm}_1_val_1.fq").exists() &&
+               new File("${outputPath}/${gsm}_2_val_2.fq").exists()
+    } else {
+        return new File("${outputPath}/${gsm}_trimmed.fq").exists()
+    }
+}
+
+def checkFastqcPostExists(gse, gsm, drug, bio, sp) {
+    def outputPath = "${params.outdir}/${gse}_${drug}_${bio}/${gsm}/fastqc_post"
+    if (sp.toLowerCase() == "paired") {
+        return new File("${outputPath}/${gsm}_1_val_1_fastqc.html").exists() &&
+               new File("${outputPath}/${gsm}_2_val_2_fastqc.html").exists() &&
+               new File("${outputPath}/${gsm}_1_val_1_fastqc.zip").exists() &&
+               new File("${outputPath}/${gsm}_2_val_2_fastqc.zip").exists()
+    } else {
+        return new File("${outputPath}/${gsm}_trimmed_fastqc.html").exists() &&
+               new File("${outputPath}/${gsm}_trimmed_fastqc.zip").exists()
+    }
+}
+
+// Définition de la fonction create_initial_channels
+def create_initial_channels() {
+    def csvChannelPerLigne = Channel
+        .fromPath(params.input_csv)
+        .splitCsv(header: true)
+        .map { row -> tuple(
+            row.Study_accession,
+            row.Sample_accession,
+            row.Drug,
+            row.Biological_type,
+            row.Trim_arg,
+            row.S_P_type,
+            row.Species
+        )}
+
+    return csvChannelPerLigne
+        .map { gse, gsm, drug, bio, trim, sp, type_cells -> tuple(
+            gse,
+            gsm.split(';').collect{it.trim()},
+            drug,
+            bio,
+            trim,
+            sp,
+            type_cells
+        )}
+        .transpose(by: 1)
+}
+
+// Processus pour FASTQC_PRE
+process FASTQC_PRE {
+    tag "$gsm"
+    publishDir "${params.outdir}/${type_cells}/${gse}_${drug}_${bio}/${gsm}/fastqc_pre", mode: 'copy'
+    errorStrategy 'ignore'
+
+    input:
+    tuple val(gse), val(gsm), val(drug), val(bio), val(trim), val(sp),val(type_cells), path(reads)
+
+    output:
+    tuple val(gse), val(gsm), val(drug), val(bio), val(trim), val(sp),val(type_cells), path("*.html"), path("*.zip"), emit: fastqc_output
+
+    when:
+    !checkFastqcPreExists(gse, gsm, drug, bio, sp)
+
+    script:
+    if (sp.toLowerCase() == "paired") {
+        """
+        echo "[INFO] FASTQC_PRE : Starting fastqc of GSM: ${gsm}"
+        fastqc --quiet ${reads[0]}
+        fastqc --quiet ${reads[1]}
+        echo "[SUCCESS] FASTQC_PRE : fastqc GSM: ${gsm}"
+        """
+    } else {
+        """
+        echo "[INFO] FASTQC_PRE : Starting fastqc of GSM: ${gsm}"
+        fastqc --quiet $reads
+        echo "[SUCCESS] FASTQC_PRE : fastqc GSM: ${gsm}"
+        """
+    }
+}
+
+// Process TRIM_GALORE_SINGLE pour les fichiers single-end
+process TRIM_GALORE_SINGLE {
+    tag "$gsm"
+    publishDir "${params.outdir}/${type_cells}/${gse}_${drug}_${bio}/${gsm}/trimmed", mode: 'copy'
+    errorStrategy 'ignore'
+
+    input:
+    tuple val(gse), val(gsm), val(drug), val(bio), val(trim), val(sp),val(type_cells), path(reads)
+
+    output:
+    tuple val(gse), val(gsm), val(drug), val(bio), val(trim), val(sp),val(type_cells), path("*_trimmed.fq"), emit: trimmed
+    path "*_trimming_report.txt"
+
+    when:
+    !checkTrimExists(gse, gsm, drug, bio, sp)
+
+    script:
+    """
+    echo "[INFO] TRIM_GALORE_SINGLE : Starting trim of GSM: ${gsm}"
+    trim_galore \
+    --fastqc \
+    --trim-n \
+    --length 18 \
+    --quality 25 \
+    --max_length 40 \
+    ${trim} \
+    ${reads}
+    echo "[SUCCESS] TRIM_GALORE_SINGLE : Completed GSM: ${gsm}"
+    """
+}
+
+// Process TRIM_GALORE_PAIRED pour les fichiers paired-end
+process TRIM_GALORE_PAIRED {
+    tag "$gsm"
+    publishDir "${params.outdir}/${type_cells}/${gse}_${drug}_${bio}/${gsm}/trimmed", mode: 'copy'
+    errorStrategy 'ignore'
+
+    input:
+    tuple val(gse), val(gsm), val(drug), val(bio), val(trim), val(sp),val(type_cells), path(reads)
+
+    output:
+    tuple val(gse), val(gsm), val(drug), val(bio), val(trim), val(sp),val(type_cells), path("*_val_*.fq"), emit: trimmed
+    path "*_trimming_report.txt"
+
+    when:
+    !checkTrimExists(gse, gsm, drug, bio, sp)
+
+    script:
+    """
+    echo "[INFO] TRIM_GALORE_PAIRED : Starting trim of GSM: ${gsm}"
+    trim_galore \
+    --paired \
+    --fastqc \
+    --trim-n \
+    --length 20 \
+    --quality 25 \
+    ${trim} \
+    ${reads[0]} ${reads[1]}
+    echo "[SUCCESS] TRIM_GALORE_PAIRED : Completed GSM: ${gsm}"
+    """
+}
+
+process FASTQC_POST {
+    tag "$gsm"
+    publishDir "${params.outdir}/${type_cells}/${gse}_${drug}_${bio}/${gsm}/fastqc_post", mode: 'copy'
+    errorStrategy 'ignore'
+
+    input:
+    tuple val(gse), val(gsm), val(drug), val(bio), val(trim), val(sp),val(type_cells), path(trimmed_reads)
+
+    output:
+    tuple val(gse), val(gsm), val(drug), val(bio), val(trim), val(sp),val(type_cells), path("*.html"), path("*.zip"), emit: fastqc_output
+    
+    when:
+    !checkFastqcPostExists(gse, gsm, drug, bio, sp)
+
+    script:
+    if (sp.toLowerCase() == "paired") {
+        """
+        echo "[INFO] FASTQC_POST : Starting fastqc of GSM: ${gsm}"     
+        fastqc --quiet ${trimmed_reads[0]}
+        fastqc --quiet ${trimmed_reads[1]}
+        echo "[SUCCESS] FASTQC_POST : Downloaded GSM: ${gsm}"           
+        """
+    } else {
+        """
+        echo "[INFO] FASTQC_POST : Starting fastqc of GSM: ${gsm}"   
+        fastqc --quiet ${trimmed_reads}
+        echo "[SUCCESS] FASTQC_POST : Downloaded GSM: ${gsm}"     
+        """
+    }
+}
+
+log.info "Starting pipeline for existing files only..."
+
+// Workflow principal
+workflow {
+    // Create initial channel
+    def csvChannelPerGsm = create_initial_channels()
+    
+    // Filter only for existing files
+    def existing_channel = csvChannelPerGsm.filter {
+        gse, gsm, drug, bio, trim, sp, type_cells -> checkFastqExists(gsm, sp)
+    }
+    
+    // // Log existing files
+    // existing_channel.view { gse, gsm, drug, bio, trim, sp ->
+    //     "Fichier existant: GSE=$gse, GSM=$gsm - sera traité"
+    // }
+    
+    // Map existing files to include file paths
+    def existing_fastq_files = existing_channel
+        .map { gse, gsm, drug, bio, trim, sp, type_cells ->
+            def fastqFiles
+            if (sp.toLowerCase() == "paired") {
+                fastqFiles = [
+                    file("${params.outdir_file_exist_already}/${gsm}_1.fastq"),
+                    file("${params.outdir_file_exist_already}/${gsm}_2.fastq")
+                ]
+            } else {
+                fastqFiles = file("${params.outdir_file_exist_already}/${gsm}.fastq")
+            }
+            tuple(gse, gsm, drug, bio, trim, sp,type_cells, fastqFiles)
+        }
+    
+    // Execute FASTQC_PRE pour les fichiers existants
+    FASTQC_PRE(existing_fastq_files)
+    
+    // Séparation des fichiers single et paired
+    def (singleFiles, pairedFiles) = existing_fastq_files
+        .branch {
+            single: it[5].toLowerCase() == "single"
+            paired: it[5].toLowerCase() == "paired"
+        }
+
+    // Exécution du trimming
+    TRIM_GALORE_SINGLE(singleFiles)
+    TRIM_GALORE_PAIRED(pairedFiles)
+    
+    // Combinaison des résultats de trimming
+    def trimmed_files = TRIM_GALORE_SINGLE.out.trimmed.mix(TRIM_GALORE_PAIRED.out.trimmed)
+    
+    // Exécution de FASTQC_POST sur les fichiers trimmed
+    FASTQC_POST(trimmed_files)
+}
+
+workflow.onComplete {
+    log.info """
+    Pipeline execution summary
+    -------------------------
+    Completed at: ${workflow.complete}
+    Duration    : ${workflow.duration}
+    Success     : ${workflow.success}
+    workDir     : ${workflow.workDir}
+    exit status : ${workflow.exitStatus}
+    """
+}
