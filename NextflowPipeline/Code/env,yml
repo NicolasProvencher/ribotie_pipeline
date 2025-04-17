@@ -1,0 +1,22 @@
+name: my-env
+channels:
+  - conda-forge
+  - bioconda
+
+dependencies:
+  # Version de Python
+  - python=3.9
+
+  # Outils utiles pour votre pipeline
+  - nextflow=24.10.4
+  - fastqc=0.12.1
+  - multiqc=1.28
+  - trim-galore=0.6.10
+
+
+  # Java est nécessaire pour Nextflow
+  - openjdk=17
+
+  # Ajoutez ici d'autres dépendances si nécessaire
+  # - star=2.5.4a
+  # - bwa=0.7.15
