@@ -15,6 +15,7 @@ Le pipeline se compose de trois étapes principales :
 - **Première étape et deuxième étape**: Utilisation de conda pour la gestion des dépendances
   ```bash
   # Activation de l'environnement conda
+  # Apres l'avoir créer 
   conda activate nextflow_env
 
 1. **Première étape** : Acquisition et prétraitement des données
