@@ -1,126 +1,136 @@
-# Pipeline d'analyse pour données de ribosome profiling
+# Analysis Pipeline for Ribosome Profiling Data
 
-Ce dépôt contient un ensemble de workflows Nextflow conçus pour l'analyse complète des données de séquençage de ribosome profiling, de l'acquisition des données brutes jusqu'aux analyses d'expression différentielle.
+This repository contains a set of Nextflow workflows designed for large scale riboseq reanalysis from the download step to detected TIS identification step. 
+Packages used
+Download:
+   sra-tools
+QC and filtering:
+   multiqc
+   fastqc
+   trim galore
+   bowtie (rRNA reads filtering)
+Alignement:
+   STAR
+ORF calling
+   RiboTIE
 
+## HPC Environment Configuration
 
-## Configuration pour environnements HPC
+This pipeline utilizes a HPC configuration as a way to run the RiboTIE step which requires GPU hardware acceleration
 
-Le pipeline est optimisé pour fonctionner sur des clusters HPC utilisant Slurm comme gestionnaire de ressources:
+## Pipeline Structure
 
-## Structure du pipeline
+The pipeline consists of three main stages:
 
-Le pipeline se compose de trois étapes principales :
-
-
-- **Première étape et deuxième étape**: Utilisation de conda pour la gestion des dépendances
+- **First and Second Stage**: Using conda for dependency management
   ```bash
-  # Activation de l'environnement conda
-  # Apres l'avoir créer 
+  # Activate conda environment
+  # After creating it
   conda activate nextflow_env
+  ```
 
-1. **Première étape** : Acquisition et prétraitement des données
-   - Téléchargement des fichiers FASTQ à partir de GSM/GSE
-   - Contrôle qualité avec FastQC (pré-traitement)
-   - Nettoyage des lectures avec Trim Galore
-   - Contrôle qualité après nettoyage (post-traitement)
+1. **First Stage**: Data Acquisition and Preprocessing
+   - Download FASTQ files from GSM/GSE
+   - Quality control with FastQC (pre-processing)
+   - Read cleaning with Trim Galore
+   - Quality control after cleaning (post-processing)
 
-2. **Deuxième étape** : Alignement des séquences
-   - Indexation du génome avec Bowtie et STAR
-   - Filtrage des ARN avec Bowtie
-   - Alignement des lectures non mappées avec STAR
-   - Génération de fichiers BAM triés pour l'analyse ultérieure
+2. **Second Stage**: Sequence Alignment
+   - Genome indexing with Bowtie and STAR
+   - RNA filtering with Bowtie
+   - Unmapped reads alignment with STAR
+   - Generation of sorted BAM files for further analysis
 
-3. **Analyse RiboTIE** : Identification des sites d'initiation de la traduction
-   - Création de fichiers YAML spécifiques à chaque expérience
-   - Préparation des données avec `ribotie --data`
-   - Analyse complète avec l'algorithme RiboTIE
+3. **RiboTIE Analysis**: Translation Initiation Site Identification
+   - Creation of experiment-specific YAML files
+   - Data preparation with `ribotie --data`
+   - Complete analysis with RiboTIE algorithm
 
-## Format du fichier CSV d'entrée
+## Input CSV File Format
 
-Le pipeline utilise un fichier CSV structuré contenant les métadonnées des échantillons à analyser. Voici les colonnes requises :
+The pipeline uses a structured CSV file containing sample metadata for analysis. Here are the required columns:
 
-| Colonne | Description |
-|---------|-------------|
-| Name | Nom de l'étude ou de l'auteur |
-| Species | Espèce biologique (ex: HS pour Homo sapiens) |
-| Study_accession | Identifiant GSE de l'étude |
-| Project_link | Lien vers la page GEO de l'étude |
-| PMID | Identifiant PubMed de la publication associée |
-| Treatment_type | Type de traitement (pre-lysis, post-lysis) |
-| Drug | Médicament utilisé (ex: cycloheximide) |
-| Sample_accession | Identifiants GSM des échantillons, séparés par des points-virgules |
-| Biological_type | Type biologique de l'échantillon (ex: Cells_A549, HAEC) |
-| Ribo_type | Type de ribosome (monosome, polysome) |
-| Trim_arg | Arguments additionnels pour Trim Galore (optionnel) |
-| S_P_type | Type de séquençage (single ou paired) |
+| Column | Description |
+|--------|-------------|
+| Name | Study or author name |
+| Species | Biological species (e.g., HS for Homo sapiens) |
+| Study_accession | GSE study identifier |
+| Project_link | Link to GEO study page |
+| PMID | PubMed ID of associated publication |
+| Treatment_type | Treatment type (pre-lysis, post-lysis) |
+| Drug | Drug used (e.g., cycloheximide) |
+| Sample_accession | GSM sample identifiers, separated by semicolons |
+| Biological_type | Sample biological type (e.g., Cells_A549, HAEC) |
+| Ribo_type | Ribosome type (monosome, polysome) |
+| Trim_arg | Additional arguments for Trim Galore (optional) |
+| S_P_type | Sequencing type (single or paired) |
 
-## Installation et configuration
+## Installation and Configuration
 
-1. Clonez ce dépôt :
+1. Clone this repository:
    ```bash
    git clone https://github.com/ilokinn/Nextflow.git
    cd Nextflow
    ```
 
-2. Avant d'exécuter le pipeline, vous devez :
-   - Faire un `git pull` pour obtenir les dernières mises à jour
-   - Modifier les chemins dans le fichier de configuration (`nextflow.config`) pour les adapter à votre environnement
+2. Before running the pipeline, you need to:
+   - Modify paths in the configuration file (`nextflow.config`) to match your environment
 
-## Chemins à modifier dans le fichier de configuration
+## Paths to Modify in Configuration File
 
-Vous devez modifier les chemins suivants dans le fichier `nextflow.config` pour les adapter à votre environnement :
+You need to modify the following paths in the `nextflow.config` file to match your environment:
 
-1. **Chemins des fichiers de référence** :
-   - `params.path_fasta_HS_B` : Fichier FASTA pour filtrage Bowtie (ARNs non-codants humains)
-   - `params.path_fasta_HS` : Génome de référence humain (FASTA)
-   - `params.path_fasta_HS_GTF` : Annotation du génome humain (GTF)
+1. **Reference File Paths**:
+   - `params.path_fasta_HS_B`: FASTA file for Bowtie filtering (human non-coding RNAs)
+   - `params.path_fasta_HS`: Human reference genome (FASTA)
+   - `params.path_fasta_HS_GTF`: Human genome annotation (GTF)
 
-2. **Chemins des répertoires de sortie** :
-   - `params.outdir_first_stage` : Répertoire de sortie pour la première étape
-   - `params.input_output_fastq_second_stage` : Répertoire contenant les fichiers FASTQ traités
-   - `params.outdir_stage_stage` : Répertoire de sortie pour la deuxième étape
-   - `params.outdir_stage_stage_parent` : Répertoire parent pour les index
-   - `params.outdir_ribotie` : Répertoire de sortie pour RiboTIE
+2. **Output Directory Paths**:
+   - `params.outdir_first_stage`: Output directory for first stage
+   - `params.input_output_fastq_second_stage`: Directory containing processed FASTQ files
+   - `params.outdir_stage_stage`: Output directory for second stage
+   - `params.outdir_stage_stage_parent`: Parent directory for indexes
+   - `params.outdir_ribotie`: Output directory for RiboTIE
 
-3. **Chemins des fichiers d'entrée** :
-   - `params.input_csv` : Fichier CSV contenant les métadonnées des échantillons
-   - `params.multiqc_config` : Fichier de configuration pour MultiQC
-   - `params.star_dir` : Répertoire contenant les résultats STAR
-   - `params.ribotie_dir` : Répertoire d'installation de RiboTIE
+3. **Input File Paths**:
+   - `params.input_csv`: CSV file containing sample metadata
+   - `params.multiqc_config`: MultiQC configuration file
+   - `params.star_dir`: Directory containing STAR results
+   - `params.ribotie_dir`: RiboTIE installation directory
 
-4. **Options de cluster** :
-   - `process.clusterOptions` : Modifier l'option `--account=rrg-xroucou` selon votre compte sur le cluster
+4. **Cluster Options**:
+   - `process.clusterOptions`: Modify `--account=rrg-xroucou` according to your cluster account
 
-## Utilisation
+## Usage
 
-Pour exécuter le pipeline complet, suivez ces étapes :
+To run the complete pipeline, follow these steps:
 
-1. Exécution de la première étape (téléchargement et prétraitement) :
+1. Run first stage (download and preprocessing):
    ```bash
    nextflow run First_stage_pipeline.nf --input_csv samples.csv
    ```
 
-2. Génération des rapports qualité MultiQC (en utilisant le fichier de config) :
+2. Generate MultiQC quality reports (using config file):
    ```bash
    nextflow run MultiQc.nf -c my_config.yaml
    ```
 
-3. (Optionnel) Centralisation des rapports MultiQC :
+3. (Optional) Centralize MultiQC reports:
    ```bash
    nextflow run MultiQc_Rapport_Management.nf
    ```
 
-4. Exécution de la deuxième étape (alignement) :
+4. Run second stage (alignment):
    ```bash
    nextflow run Second_Stage.3.1.nf -profile beluga
    ```
 
-5. Exécution de l'analyse RiboTIE :
+5. Run RiboTIE analysis:
    ```bash
    nextflow run Third_Stage.2.0.nf
    ```
 
-## Prérequis
+## Prerequisites
 
 - Nextflow
 - Bowtie2
@@ -128,9 +138,9 @@ Pour exécuter le pipeline complet, suivez ces étapes :
 - FastQC
 - Trim Galore
 - MultiQC
-- Python 3.9+ (pour RiboTIE)
-- CUDA (pour l'accélération GPU de RiboTIE)
+- Python 3.9+ (for RiboTIE)
+- CUDA (for RiboTIE GPU acceleration)
 
-## Configuration pour environnements HPC
+## HPC Environment Configuration
 
-Le pipeline est optimisé pour fonctionner sur des clusters HPC utilisant Slurm comme gestionnaire de ressources. Des profils préconfigurés sont disponibles dans `nextflow.config`.
+The pipeline is optimized to run on HPC clusters using Slurm as a resource manager. Pre-configured profiles are available in `nextflow.config`.

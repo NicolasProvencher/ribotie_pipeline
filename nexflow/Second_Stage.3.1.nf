@@ -1,16 +1,16 @@
-// Pipeline pour l'analyse de données de séquençage
-// 1. Indexation avec bowtie et STAR
-// 2. Alignement avec bowtie pour filtrer les ARN
-// 3. Alignement des lectures non mappées avec STAR
+// Pipeline for sequencing data analysis
+// 1. Indexing with bowtie and STAR
+// 2. Alignment with bowtie to filter RNAs
+// 3. Alignment of unmapped reads with STAR
 
 nextflow.enable.dsl = 2
 params.max_retries = 3
-// le dossier output_complet est le resultat de premier stage
+// The output_complet folder is the result of the first stage
 params.input_output_fastq_second_stage = '/home/ilyass09/scratch/riboseq_pipeline/Etape_final_trimmed/HS'
 params.input_csv_test = '/home/ilyass09/scratch/riboseq_pipeline/Samples_sheet/Samples_sheet_final.csv'
 params.outdir_stage_stage = '/home/ilyass09/scratch/riboseq_pipeline/Second_Stage_HS_final_2'
 params.outdir_stage_stage_parent = '/home/ilyass09/scratch/riboseq_pipeline'
-// Fonctions de vérification pour chaque type de fichier
+// Verification functions for each file type
 def checkFastqExists(gse, gsm, drug, bio, sp) {
     def outputPath = "${params.input_output_fastq_second_stage}/${gse}_${drug}_${bio}/${gsm}/trimmed"
     if (sp.toLowerCase() == "paired") {
@@ -23,7 +23,7 @@ def checkFastqExists(gse, gsm, drug, bio, sp) {
     }
 }
 
-// Définition de la fonction pour créer les channels
+// Definition of the function to create channels
 def create_initial_channels() {
     def csvChannelPerLigne = Channel
         .fromPath(params.input_csv_test)
@@ -51,7 +51,7 @@ def create_initial_channels() {
         .transpose(by: 1)
 }
 
-// Fonctions auxiliaires pour obtenir les chemins des fichiers
+// Auxiliary functions to get file paths
 def getFastaPathBowtie(type) {
     switch(type.toUpperCase()) {
         case 'HS': return params.path_fasta_HS_B
@@ -60,7 +60,7 @@ def getFastaPathBowtie(type) {
         case 'SC': return params.path_fasta_SC_B
         case 'DR': return params.path_fasta_DR_B
         case 'SM': return params.path_fasta_SM_B
-        default: throw new RuntimeException("Type non reconnu: ${type}")
+        default: throw new RuntimeException("Unrecognized type: ${type}")
     }
 }
 
@@ -72,7 +72,7 @@ def getFastaPathStar(type) {
         case 'SC': return params.path_fasta_SC
         case 'DR': return params.path_fasta_DR
         case 'SM': return params.path_fasta_SM
-        default: throw new RuntimeException("Type non reconnu: ${type}")
+        default: throw new RuntimeException("Unrecognized type: ${type}")
     }
 }
 
@@ -84,36 +84,36 @@ def getGtfPath(type) {
         case 'SC': return params.path_fasta_SC_GTF
         case 'DR': return params.path_fasta_DR_GTF
         case 'SM': return params.path_fasta_SM_GTF
-        default: throw new RuntimeException("Type non reconnu: ${type}")
+        default: throw new RuntimeException("Unrecognized type: ${type}")
     }
 }
 
-// Ajouter ces fonctions avec les autres fonctions de vérification
+// Add these functions with other verification functions
 def checkFastaExists(path) {
     if (!path) {
-        println "[AVERTISSEMENT] Le chemin du fichier FASTA n'est pas défini"
+        println "[WARNING] FASTA file path is not defined"
         return false
     }
     def file = new File(path)
     if (!file.exists()) {
-        println "[ERREUR] Fichier FASTA manquant: ${path}"
+        println "[ERROR] Missing FASTA file: ${path}"
         return false
     }
-    println "[INFO] Fichier FASTA trouvé: ${path}"
+    println "[INFO] FASTA file found: ${path}"
     return true
 }
 
 def checkGtfExists(path) {
     if (!path) {
-        println "[AVERTISSEMENT] Le chemin du fichier GTF n'est pas défini"
+        println "[WARNING] GTF file path is not defined"
         return false
     }
     def file = new File(path)
     if (!file.exists()) {
-        println "[ERREUR] Fichier GTF manquant: ${path}"
+        println "[ERROR] Missing GTF file: ${path}"
         return false
     }
-    println "[INFO] Fichier GTF trouvé: ${path}"
+    println "[INFO] GTF file found: ${path}"
     return true
 }
 
@@ -135,14 +135,14 @@ process BOWTIE_INDEX {
 
     script:
     """
-    echo "Indexation Bowtie pour ${type} avec le fichier ${fasta_file}"
+    echo "Bowtie indexing for ${type} with file ${fasta_file}"
     bowtie2-build ${fasta_file} ${type}
     
-    # Vérification des index générés
-    echo "Index Bowtie générés:"
+    # Verify generated indices
+    echo "Generated Bowtie indices:"
     ls -la *.bt2
     
-    echo "Indexation Bowtie terminée avec préfixe: ${type}"
+    echo "Bowtie indexing completed with prefix: ${type}"
     """
 }
 
@@ -163,7 +163,7 @@ process STAR_INDEX {
 
     script:
     """
-    echo "Indexation STAR pour ${type} avec le fichier ${fasta_file} et GTF ${gtf}"
+    echo "STAR indexing for ${type} with file ${fasta_file} and GTF ${gtf}"
     mkdir -p ${type}_star_index
     STAR --runThreadN 5\
      --genomeDir ${type}_star_index \
@@ -171,18 +171,18 @@ process STAR_INDEX {
      --genomeFastaFiles ${fasta_file} \
      --sjdbGTFfile ${gtf} \
      --genomeSAindexNbases 8
-    echo "Indexation STAR terminée"
+    echo "STAR indexing completed"
     """
 }
 
-// Définition du process bowtie_single
+// Definition of the process bowtie_single
 process BOWTIE_SINGLE {
     cpus 5
     memory '25 GB'
     time '12h'
     beforeScript 'module load bowtie2'  
-    // Tentative maximale de 3    
-    // Stratégie dynamique: retry jusqu'à la 3ème tentative, puis ignore
+    // Maximum attempt of 3    
+    // Dynamic strategy: retry up to the 3rd attempt, then ignore
     errorStrategy 'ignore'     
     tag "${gsm}"
     publishDir "${params.outdir_stage_stage}/bowtie/${gse}_${drug}_${bio}/${gsm}", mode: 'copy'
@@ -195,19 +195,19 @@ process BOWTIE_SINGLE {
     path("${gsm}_bowtie.log"), emit: log_file
 
     script:
-    // Récupérer le préfixe des index (sans l'extension)
+    // Retrieve the index prefix (without extension)
     def index_prefix = bowtie_indexes[0].toString() - ~/\.[0-9]\.bt2$/
     
     """
-    # S'assurer que le fichier FASTQ est correctement identifié
+    # Ensure the FASTQ file is correctly identified
     FASTQ=\$(ls -1 ${fastq_file})
     
     echo "Using index: ${index_prefix}"
     echo "Input file: \$FASTQ"
     echo "Index files: ${bowtie_indexes.join(', ')}"
     
-    # Exécuter Bowtie2 avec les paramètres pour single-end et rediriger vers /dev/null
-    # puisque nous ne sommes intéressés que par les lectures non mappées
+    # Run Bowtie2 with parameters for single-end and redirect to /dev/null
+    # since we are only interested in unmapped reads
     bowtie2 \
         -p 5 \
         -x ${index_prefix} \
@@ -221,12 +221,12 @@ process BOWTIE_PAIRED {
     cpus 10
     memory '50 GB'
     time '3h'
-    stageInMode 'copy'  // Forcer la copie des fichiers plutôt que des liens symboliques
+    stageInMode 'copy'  // Force copying files instead of symbolic links
     beforeScript 'module load bowtie2'  
-    // Tentative maximale de 3
+    // Maximum attempt of 3
     maxRetries 3
     
-    // Stratégie dynamique: retry jusqu'à la 3ème tentative, puis ignore
+    // Dynamic strategy: retry up to the 3rd attempt, then ignore
     errorStrategy { task.attempt <= 3 ? 'retry' : 'ignore' }    
     tag "${gsm}"
     publishDir "${params.outdir_stage_stage}/bowtie/${gse}_${drug}_${bio}/${gsm}", mode: 'copy'
@@ -239,7 +239,7 @@ process BOWTIE_PAIRED {
     path("${gsm}_bowtie.log"), emit: log_file
 
     script:
-    // Récupérer le préfixe des index (sans l'extension)
+    // Retrieve the index prefix (without extension)
     def index_prefix = bowtie_indexes[0].toString() - ~/\.[0-9]\.bt2$/
 
     """
@@ -254,13 +254,13 @@ process BOWTIE_PAIRED {
 }
 
 
-// Mise à jour du process STAR_SINGLE
+// Update of the process STAR_SINGLE
 process STAR_SINGLE {
     cpus 5
     memory '60 GB'
     time '12h'
     beforeScript 'module load star'  
-    // Tentative maximale de 3
+    // Maximum attempt of 3
     errorStrategy 'ignore'     
  
     tag "${gsm}"
@@ -277,9 +277,9 @@ process STAR_SINGLE {
 
     script:
     """
-    echo "Traitement STAR pour ${gsm} avec ${unmapped_fq}"
+    echo "STAR processing for ${gsm} with ${unmapped_fq}"
 
-     # Déterminer le répertoire parent contenant les fichiers d'index
+     # Determine the parent directory containing the index files
     INDEX_DIR=\$(dirname \$(readlink -f ${star_indexes[0]}))
     
     STAR --runThreadN 5 \
@@ -297,22 +297,22 @@ process STAR_SINGLE {
          --alignEndsType EndToEnd \
          --outWigType bedGraph
          
-    echo "Traitement STAR terminé pour ${gsm}"
-    echo "Vérification des fichiers générés:"
+    echo "STAR processing completed for ${gsm}"
+    echo "Verification of generated files:"
     ls -la
     """
 }
 
-// Mise à jour du process STAR_PAIRED
+// Update of the process STAR_PAIRED
 process STAR_PAIRED {
     cpus 5
     memory '70 GB'
     time '6h' 
     beforeScript 'module load star'  
-    // Tentative maximale de 3
+    // Maximum attempt of 3
     maxRetries 3
     
-    // Stratégie dynamique: retry jusqu'à la 3ème tentative, puis ignore
+    // Dynamic strategy: retry up to the 3rd attempt, then ignore
     errorStrategy { task.attempt <= 3 ? 'retry' : 'ignore' }
     tag "${gsm}"
     publishDir "${params.outdir_stage_stage}/STAR/${gse}_${drug}_${bio}/${gsm}", mode: 'copy'
@@ -327,21 +327,21 @@ process STAR_PAIRED {
     path("*")
 
     script:
-    // Détecter le pattern des fichiers non mappés (peut varier selon la version de Bowtie2)
+    // Detect the pattern of unmapped files (may vary depending on Bowtie2 version)
     def read1 = unmapped_fq.find { it.toString().contains("_1.fq") || it.toString().contains("_unmapped_1.fq") }
     def read2 = unmapped_fq.find { it.toString().contains("_2.fq") || it.toString().contains("_unmapped_2.fq") }
     
     if (!read1 || !read2) {
-        // Fallback si le pattern est différent
+        // Fallback if the pattern is different
         def files = unmapped_fq.sort()
         read1 = files[0]
         read2 = files[1]
     }
     
     """
-    echo "Traitement STAR pour ${gsm} avec ${read1} et ${read2}"
+    echo "STAR processing for ${gsm} with ${read1} and ${read2}"
      
-     # Déterminer le répertoire parent contenant les fichiers d'index
+     # Determine the parent directory containing the index files
     INDEX_DIR=\$(dirname \$(readlink -f ${star_indexes[0]}))
     
     STAR --runThreadN 5 \
@@ -359,19 +359,19 @@ process STAR_PAIRED {
          --alignEndsType EndToEnd \
          --outWigType bedGraph
          
-    echo "Traitement STAR terminé pour ${gsm}"
-    echo "Vérification des fichiers générés:"
+    echo "STAR processing completed for ${gsm}"
+    echo "Verification of generated files:"
     ls -la
     """
 }
 
-// Workflow principal
+// Main workflow
 
 workflow {
-    // Créer le channel initial
+    // Create the initial channel
     def csvChannelPerGsm = create_initial_channels()
 
-    // Création d'un channel pour les fichiers existants
+    // Create a channel for existing files
     def existing_fastq_files = csvChannelPerGsm
         .filter { it -> 
             checkFastqExists(it[0], it[1], it[2], it[3], it[5])
@@ -380,7 +380,7 @@ workflow {
             def outputPath = "${params.input_output_fastq_second_stage
         }/${gse}_${drug}_${bio}/${gsm}/trimmed"
             if (sp.toLowerCase() == "paired") {
-                def fastq1 = file("${outputPath}/${gsm}_1_val_1.fq") // a modifier a /${gsm}_1_trimmed.fq donc il faut adaper le premier stage
+                def fastq1 = file("${outputPath}/${gsm}_1_val_1.fq") // to be modified to /${gsm}_1_trimmed.fq so the first stage needs to be adapted
                 def fastq2 = file("${outputPath}/${gsm}_2_val_2.fq")
                 tuple(type, gse, gsm, drug, bio, sp, fastq1, fastq2)
             } else {
@@ -389,27 +389,27 @@ workflow {
             }
         }
 
-    // Séparation en deux channels distincts selon le type de séquençage
+    // Split into two distinct channels based on sequencing type
     def (singleChannel, pairedChannel) = existing_fastq_files.branch {
         single: it[5].toLowerCase() == 'single'
         paired: it[5].toLowerCase() == 'paired'
     }
 
-    Channel.of(params.input_csv_test).view{ "Le path de csv: $it" }
-    Channel.of(params.input_output_fastq_second_stage).view{ "Le path des fichiers fastq: $it" }
+    Channel.of(params.input_csv_test).view{ "CSV path: $it" }
+    Channel.of(params.input_output_fastq_second_stage).view{ "FASTQ files path: $it" }
 
-    // Debug des channels d'entrée
+    // Debug input channels
     singleChannel.count().subscribe { count ->
-        println "\n[INFO] Nombre d'échantillons single-end à traiter: ${count}\n"
+        println "\n[INFO] Number of single-end samples to process: ${count}\n"
     }
     
     pairedChannel.count().subscribe { count ->
-        println "\n[INFO] Nombre d'échantillons paired-end à traiter: ${count}\n"
+        println "\n[INFO] Number of paired-end samples to process: ${count}\n"
     }
     
-    // Extraire les types uniques puis la verification si les fichiers necessaires sont presents comme paths
+    // Extract unique types and verify if necessary files are present as paths
     def species_types = existing_fastq_files
-        .map { it -> it[0] }  // Extraire le type (species)
+        .map { it -> it[0] }  // Extract the type (species)
         .unique()
         .filter { type -> 
             def fasta_bowtie = getFastaPathBowtie(type)
@@ -421,12 +421,12 @@ workflow {
                           checkGtfExists(gtf_star)
             
             if (!filesExist) {
-                println "[AVERTISSEMENT] Fichiers manquants pour le type: ${type}"
+                println "[WARNING] Missing files for type: ${type}"
             }
             return filesExist
         }
 
-    // Créer les channels pour Bowtie et STAR séparément pour l'indexation
+    // Create channels for Bowtie and STAR separately for indexing
     def bowtie_input = species_types
         .map { type ->
             tuple(type, file(getFastaPathBowtie(type)))
@@ -441,29 +441,29 @@ workflow {
             )
         }
 
-    // Lancer les processus d'indexation 
+    // Launch indexing processes 
     def bowtie_indices = BOWTIE_INDEX(bowtie_input)
     def star_indices = STAR_INDEX(star_input)
 
-    // Debug des informations d'index
+    // Debug index information
     bowtie_indices.bowtie_index_output.view { type, files ->
-        println "[INFO] Index Bowtie généré pour: $type (${files.size()} fichiers)"
+        println "[INFO] Bowtie index generated for: $type (${files.size()} files)"
     }
 
     star_indices.star_index_output.view { type, files ->
-        println "[INFO] Index STAR généré pour: $type (${files.size()} fichiers)"
+        println "[INFO] STAR index generated for: $type (${files.size()} files)"
     }
 
-    // Transformer le channel d'index pour avoir le bon format pour la combinaison
+    // Transform the index channel to have the correct format for combination
     def bowtie_indices_formatted = bowtie_indices.bowtie_index_output
 
-    // SingleChnnel contient les lignes de csv qui sont des single    
-    // Combiner les channels avec les index correspondants - FIXED
+    // SingleChannel contains the CSV lines that are single    
+    // Combine channels with corresponding indices - FIXED
     def bowtie_single_with_index = singleChannel
         .map { type, gse, gsm, drug, bio, sp, fastq -> 
             return tuple(type, gse, gsm, drug, bio, sp, fastq)
         }
-        .combine(bowtie_indices_formatted, by: 0) // La commande combine lie entre les lignes de fichier csv et les fichiers produits par l'indexation 
+        .combine(bowtie_indices_formatted, by: 0) // The combine command links between the CSV file lines and the files produced by indexing 
     
     def bowtie_paired_with_index = pairedChannel
         .map { type, gse, gsm, drug, bio, sp, fastq1, fastq2 -> 

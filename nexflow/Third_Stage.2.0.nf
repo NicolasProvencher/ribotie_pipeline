@@ -3,14 +3,15 @@
 // DSL version
 nextflow.enable.dsl = 2
 
-// Paramètres spécifiques pour RiboTIE
+// Specific parameters for RiboTIE
 // params.star_dir = '/home/ilyass09/scratch/riboseq_pipeline/Second_Stage_copy/HS/STAR'
 // params.input_csv = '/home/ilyass09/scratch/riboseq_pipeline/Samples_sheet/test.csv'
 // params.outdir_ribotie = '/home/ilyass09/scratch/riboseq_pipeline/Ribotie_complet'
 // params.ribotie_dir = '/home/ilyass09/scratch/riboseq_pipeline/ribotie'
 
 // params.ignore_ribotie_errors = true
-// Fonctions auxiliaires pour obtenir les chemins des fichiers
+
+// Helper functions to get file paths
 def getFastaPath(type) {
     switch(type.toUpperCase()) {
         case 'HS': return params.path_fasta_HS
@@ -19,7 +20,7 @@ def getFastaPath(type) {
         case 'SC': return params.path_fasta_SC
         case 'DR': return params.path_fasta_DR
         case 'SM': return params.path_fasta_SM
-        default: throw new RuntimeException("Type non reconnu: ${type}")
+        default: throw new RuntimeException("Unrecognized type: ${type}")
     }
 }
 
@@ -31,12 +32,12 @@ def getGtfPath(type) {
         case 'SC': return params.path_fasta_SC_GTF
         case 'DR': return params.path_fasta_DR_GTF
         case 'SM': return params.path_fasta_SM_GTF
-        default: throw new RuntimeException("Type non reconnu: ${type}")
+        default: throw new RuntimeException("Unrecognized type: ${type}")
     }
 }
 
-// TODO: Je pense pas je vaius utiliserr les csv pour ce fichier separer
-// Définition de la fonction pour créer les channels
+// TODO: I don't think I will use CSV for this separate file
+// Definition of function to create channels
 def create_initial_channels() {
     def csvChannelPerLigne = Channel
         .fromPath(params.input_csv)
@@ -64,52 +65,52 @@ def create_initial_channels() {
         .transpose(by: 1)
 }
 
-// Fonction pour créer un channel à partir des dossiers STAR (version simplifiée)
+// Function to create channel from STAR folders (simplified version)
 def create_star_bam_channels() {
     def results = []
     
-    // Récupérer tous les dossiers GSE
+    // Get all GSE folders
     def starDir = new File(params.star_dir)
     if (!starDir.exists()) {
-        log.error "Le dossier STAR n'existe pas: ${params.star_dir}"
+        log.error "STAR directory does not exist: ${params.star_dir}"
         return Channel.empty()
     }
     
-    // Parcourir les dossiers GSE
+    // Iterate through GSE folders
     starDir.eachDir { gseDir ->
         def gseDirName = gseDir.name
-        // Extraire le GSE, drug et bio_type du nom du dossier
+        // Extract GSE, drug, and bio_type from folder name
         def parts = gseDirName.split('_')
         if (parts.length >= 3) {
             def gse = parts[0]
             def drug = parts[1]
             def bio = parts.length > 2 ? parts[2..-1].join('_') : ""
             
-            // Parcourir les dossiers GSM
+            // Iterate through GSM folders
             gseDir.eachDir { gsmDir ->
                 def gsm = gsmDir.name
-                // Chercher le fichier BAM du transcriptome
+                // Look for BAM file of the transcriptome
                 def bamFile = new File(gsmDir, "${gsm}_Aligned.toTranscriptome.out.bam")
                 if (bamFile.exists()) {
-                    // Ajouter directement chaque entrée GSM au résultat
+                    // Add each GSM entry directly to the result
                     results.add(tuple(gse, gsm, drug, bio, bamFile.absolutePath))
                 }
             }
         }
     }
     
-    // Créer et retourner le channel
+    // Create and return the channel
     return Channel.fromList(results)
 }
 
-// Process pour créer un fichier YAML par GSE
+// Process to create YAML file per GSE
 process CREATE_GSE_YAML {
     tag "${gse}_${drug}_${bio}"
     cpus 1
     memory '1 GB'
     time '30m'
     
-    // Essayez avec le mode 'copy' et 'create: true'
+    // Try with 'copy' mode and 'create: true'
     publishDir "${params.outdir_ribotie}/${gse}_${drug}_${bio}", mode: 'copy', create: true
     
     input:
@@ -124,12 +125,12 @@ process CREATE_GSE_YAML {
     def h5_dir = "${params.outdir_ribotie}/${gse}_${drug}_${bio}/ribotie_data_results"
     def ribo_paths_str = ""
     
-    // Créer les entrées pour ribo_paths
+    // Create entries for ribo_paths
     for (int i = 0; i < gsm_list.size(); i++) {
         ribo_paths_str += "  ${gsm_list[i]}: ${bam_list[i]}\n"
     }
     
-    // Créer les groupes d'échantillons avec le format spécifique demandé
+    // Create sample groups with the specific format required
     def samples_str = "samples:\n"
     samples_str += "  - - ${gsm_list[0]}\n"
     
@@ -138,7 +139,7 @@ process CREATE_GSE_YAML {
     }
     
     """
-    # Créer explicitement les répertoires de sortie
+    # Explicitly create output directories
     mkdir -p ${params.outdir_ribotie}/${gse}_${drug}_${bio}
     mkdir -p ${h5_dir}
     
@@ -155,12 +156,12 @@ h5_path: ${h5_dir}/${gse}_${drug}_${bio}.h5
 out_dir: ${params.outdir_ribotie}/${gse}_${drug}_${bio}/results
 EOF
     
-    # Copier explicitement le fichier si nécessaire
+    # Copy file explicitly if needed
     cp ${gse}_${drug}_${bio}.yml ${params.outdir_ribotie}/${gse}_${drug}_${bio}/
     """
 }
 
-// Processus pour exécuter RiboTIE sur chaque fichier YAML de GSE
+// Process to run RiboTIE on each GSE YAML file
 process RUN_RIBOTIE_DATA {
     tag "${gse}_${drug}_${bio}"
     
@@ -185,13 +186,13 @@ process RUN_RIBOTIE_DATA {
     
     script:
     """
-    # Préparation de l'environnement
+    # Prepare the environment
     export PATH="\$PATH:${params.ribotie_dir}/bin"
     virtualenv --no-download \$SLURM_TMPDIR/env
     source \$SLURM_TMPDIR/env/bin/activate
     pip install --no-index transcript_transformer
     
-    # Exécuter RiboTIE avec le fichier YAML comme template
+    # Run RiboTIE with the YAML file as template
     ribotie ${yaml_file} --data > ribotie_data_log.txt 2>&1
 
     """
@@ -218,28 +219,28 @@ process RUN_RIBOTIE {
     
     script:
     """
-    # Préparation de l'environnement
+    # Prepare the environment
     export PATH="\$PATH:${params.ribotie_dir}/bin"
     virtualenv --no-download \$SLURM_TMPDIR/env
     source \$SLURM_TMPDIR/env/bin/activate
     pip install --no-index transcript_transformer
     
-    # Exécuter RiboTIE avec le fichier YAML comme template
+    # Run RiboTIE with the YAML file as template
     ribotie ${yaml_file}  > ribotie_log.txt 2>&1
 
     """
 }
 
 workflow {
-    // Créer le channel à partir des dossiers STAR
+    // Create the channel from STAR folders
     def bam_channel = create_star_bam_channels()
     
-    // Afficher le contenu du channel
+    // Display the content of the channel
     bam_channel.view { gse, gsm, drug, bio, bam_path ->
         return "GSE: $gse, GSM: $gsm, Drug: $drug, Bio: $bio, BAM: $bam_path"
     }
     
-    // Regrouper les BAM par GSE/drug/bio
+    // Group BAMs by GSE/drug/bio
     def grouped_bams = bam_channel
         .map { gse, gsm, drug, bio, bam_path -> 
             def key = [gse, drug, bio]
@@ -250,30 +251,30 @@ workflow {
             def (gse, drug, bio) = key
             def gsm_list = values.collect { it[0] }
             def bam_list = values.collect { it[1] }
-            // Ajouter un type par défaut (vous pouvez l'adapter selon vos besoins)
-            // TODO: On travaille directement sur les HS parce que ribotie est adapter pour les HS , donc il faut penser a modifier la strucutre du path input 
-            // au lieu de STAR/HS vers STAR direct 
-            def type = "HS"  // Par défaut Human
+            // Add a default type (you can adapt it as needed)
+            // TODO: We are working directly on HS because RiboTIE is adapted for HS, so we need to think about modifying the input path structure
+            // instead of STAR/HS to STAR directly
+            def type = "HS"  // Default to Human
             return tuple(gse, gsm_list, drug, bio, bam_list, type)
         }
     
-    // Afficher les groupes
+    // Display the groups
     grouped_bams.view { gse, gsm_list, drug, bio, bam_list, type ->
         return "GSE: $gse, Drug: $drug, Bio: $bio, Type: $type\nGSMs: ${gsm_list.join(', ')}\nBAMs: ${bam_list.join(', ')}"
     }
     
-    // Créer les fichiers YAML par GSE
+    // Create YAML files per GSE
     def gse_yaml_files = CREATE_GSE_YAML(grouped_bams)
     
-    // Exécuter RiboTIE sur chaque fichier YAML de GSE
+    // Run RiboTIE on each GSE YAML file
     def csv_files = RUN_RIBOTIE_DATA(gse_yaml_files.gse_yaml_file)
     
-    // Afficher les résultats
+    // Display the results
     RUN_RIBOTIE_DATA.out.ribotie_results_data.view { gse, drug, bio, result_files ->
         return "RiboTIE completed for GSE: $gse, Drug: $drug, Bio: $bio"
     }
     RUN_RIBOTIE(csv_files.ribotie_results_data)
-    // Afficher les résultats
+    // Display the results
     RUN_RIBOTIE.out.ribotie_results.view { gse, drug, bio, result_files ->
         return "RiboTIE completed for GSE: $gse, Drug: $drug, Bio: $bio"
     }

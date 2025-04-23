@@ -1,13 +1,13 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl = 2
-//  Dans cette partie 
-// tous fonctionne bien mais j'ai besoin de verifier les multiQc pour que assurer que tout est bon genre le trim
-// Ce code est personnaliser pour les fichiers de nicolas qui sont dans un desordre 
+// In this part
+// everything works well but I need to verify the MultiQC to ensure everything is good like the trim
+// This code is customized for Nicolas' files which are in disorder
 
 // Define parameters
-params.outdir_file_exist_already = "/home-vhost32/xroucou_group/analysis/openprot_2.0/ribo-seq/fastq"
-params.outdir = "/project/def-xroucou/riboseq_pipeline/Etape_final_trimmed"
-params.input_csv = "/project/def-xroucou/riboseq_pipeline/test_work_pipeline/Samples_sheet_final.csv"
+params.outdir_file_exist_already = "/path/to/directory/containing/fastq"
+params.outdir = "/path/to/trim/output/directory"
+params.input_csv = "/path/to/samplesheet/directory/samplesheet.csv"
 params.max_retries = 3
 
 // Function to check if files exist in the fastq directory
@@ -27,13 +27,13 @@ def checkFastqExists(gsm, sp) {
             found = files.any { it == "${gsm}.fastq" }
         }
     } catch (Exception e) {
-        log.error "Erreur lors de la vérification des fichiers pour GSM: $gsm - ${e.message}"
+        log.error "Error while checking files for GSM: $gsm - ${e.message}"
     }
     
     return found
 }
 
-// Fonctions de vérification pour les étapes post-téléchargement
+// Verification functions for post-download steps
 def checkFastqcPreExists(gse, gsm, drug, bio, sp) {
     def outputPath = "${params.outdir}/${gse}_${drug}_${bio}/${gsm}/fastqc_pre"
     if (sp.toLowerCase() == "paired") {
@@ -70,7 +70,7 @@ def checkFastqcPostExists(gse, gsm, drug, bio, sp) {
     }
 }
 
-// Définition de la fonction create_initial_channels
+// Definition of the create_initial_channels function
 def create_initial_channels() {
     def csvChannelPerLigne = Channel
         .fromPath(params.input_csv)
@@ -98,7 +98,7 @@ def create_initial_channels() {
         .transpose(by: 1)
 }
 
-// Processus pour FASTQC_PRE
+// Process for FASTQC_PRE
 process FASTQC_PRE {
     tag "$gsm"
     publishDir "${params.outdir}/${type_cells}/${gse}_${drug}_${bio}/${gsm}/fastqc_pre", mode: 'copy'
@@ -130,7 +130,7 @@ process FASTQC_PRE {
     }
 }
 
-// Process TRIM_GALORE_SINGLE pour les fichiers single-end
+// Process TRIM_GALORE_SINGLE for single-end files
 process TRIM_GALORE_SINGLE {
     tag "$gsm"
     publishDir "${params.outdir}/${type_cells}/${gse}_${drug}_${bio}/${gsm}/trimmed", mode: 'copy'
@@ -161,7 +161,7 @@ process TRIM_GALORE_SINGLE {
     """
 }
 
-// Process TRIM_GALORE_PAIRED pour les fichiers paired-end
+// Process TRIM_GALORE_PAIRED for paired-end files
 process TRIM_GALORE_PAIRED {
     tag "$gsm"
     publishDir "${params.outdir}/${type_cells}/${gse}_${drug}_${bio}/${gsm}/trimmed", mode: 'copy'
@@ -225,7 +225,7 @@ process FASTQC_POST {
 
 log.info "Starting pipeline for existing files only..."
 
-// Workflow principal
+// Main workflow
 workflow {
     // Create initial channel
     def csvChannelPerGsm = create_initial_channels()
@@ -237,7 +237,7 @@ workflow {
     
     // // Log existing files
     // existing_channel.view { gse, gsm, drug, bio, trim, sp ->
-    //     "Fichier existant: GSE=$gse, GSM=$gsm - sera traité"
+    //     "Existing file: GSE=$gse, GSM=$gsm - will be processed"
     // }
     
     // Map existing files to include file paths
@@ -255,24 +255,24 @@ workflow {
             tuple(gse, gsm, drug, bio, trim, sp,type_cells, fastqFiles)
         }
     
-    // Execute FASTQC_PRE pour les fichiers existants
+    // Execute FASTQC_PRE for existing files
     FASTQC_PRE(existing_fastq_files)
     
-    // Séparation des fichiers single et paired
+    // Separate single and paired files
     def (singleFiles, pairedFiles) = existing_fastq_files
         .branch {
             single: it[5].toLowerCase() == "single"
             paired: it[5].toLowerCase() == "paired"
         }
 
-    // Exécution du trimming
+    // Execute trimming
     TRIM_GALORE_SINGLE(singleFiles)
     TRIM_GALORE_PAIRED(pairedFiles)
     
-    // Combinaison des résultats de trimming
+    // Combine trimming results
     def trimmed_files = TRIM_GALORE_SINGLE.out.trimmed.mix(TRIM_GALORE_PAIRED.out.trimmed)
     
-    // Exécution de FASTQC_POST sur les fichiers trimmed
+    // Execute FASTQC_POST on trimmed files
     FASTQC_POST(trimmed_files)
 }
 

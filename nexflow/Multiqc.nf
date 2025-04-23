@@ -1,19 +1,19 @@
 #!/usr/bin/env nextflow
 
-params.outdir_first_stage = "/project/def-xroucou/riboseq_pipeline/Etape_final_GSE63570/HS"
-params.multiqc_config = "/project/def-xroucou/riboseq_pipeline/config_multiqc.yaml"
+params.outdir_first_stage = "/path/to/first_stage/output/directory"
+params.multiqc_config = "/path/to/Ribotie_nextflow_pipeline/multiqc_custom_config.yaml"
 
 log.info """\
 =================================================================
-MultiQC par GSE - Nextflow Pipeline (Organisation par dossier)
+MultiQC by GSE - Nextflow Pipeline (Folder Organization)
 =================================================================
-Répertoire d'entrée     : ${params.outdir_first_stage}
-Répertoire de sortie    : ${params.outdir_first_stage}
-Config MultiQC          : ${params.multiqc_config}
+Input directory      : ${params.outdir_first_stage}
+Output directory     : ${params.outdir_first_stage}
+MultiQC Config       : ${params.multiqc_config}
 =================================================================
 """
 
-// Trouver tous les répertoires GSE
+// Find all GSE directories
 process FIND_GSE_DIRS {
     output:
     path "gse_dirs.txt", emit: gse_dirs
@@ -24,11 +24,11 @@ process FIND_GSE_DIRS {
     """
 }
 
-// Exécuter MultiQC directement dans chaque dossier GSE
+// Run MultiQC directly in each GSE folder
 process RUN_MULTIQC {
     publishDir "${params.outdir_first_stage}/${gse_name}/multiqc", mode: 'copy', overwrite: true
     
-    conda "/home/ilyass09/project/pipeline/code/env.yml"
+    conda "/path/to/conda/env_yaml/env.yml"
     memory '4 GB'
     
     input:
@@ -43,16 +43,16 @@ process RUN_MULTIQC {
     """
     export CONDA_NO_PLUGINS=true
     
-    # Se déplacer dans le répertoire GSE et exécuter MultiQC directement
+    # Move to the GSE directory and run MultiQC directly
     cd ${gse_dir}
     
-    # Exécuter MultiQC pour analyser tous les fichiers FastQC dans le répertoire
+    # Run MultiQC to analyze all FastQC files in the directory
     multiqc -v -f -c ${params.multiqc_config} \
         --filename multiqc_report.html \
         --ignore "*/work/*" \
         --ignore "*/multiqc/*" .
     
-    # Vérifier le résultat
+    # Check the result
     if [ ! -f "multiqc_report.html" ]; then
         touch multiqc_report.html
         mkdir -p multiqc_data
@@ -61,30 +61,30 @@ process RUN_MULTIQC {
 }
 
 workflow {
-    // Trouver tous les répertoires GSE
+    // Find all GSE directories
     FIND_GSE_DIRS()
     
-    // Créer un canal à partir des chemins des répertoires GSE
+    // Create a channel from the paths of the GSE directories
     gse_dirs_ch = FIND_GSE_DIRS.out.gse_dirs
         .splitText()
         .map { it.trim() }
         .filter { it != "" }
     
-    // Exécuter MultiQC sur chaque GSE
+    // Run MultiQC on each GSE
     RUN_MULTIQC(gse_dirs_ch)
 }
 
-// Notification de fin et récapitulatif
+// End notification and summary
 workflow.onComplete {
     log.info """
     =================================================================
-    Exécution terminée!
+    Execution completed!
     
-    Résumé:
-    - Statut: ${workflow.success ? "SUCCÈS" : "ÉCHEC"}
-    - Répertoire de sortie: ${params.outdir_first_stage}
+    Summary:
+    - Status: ${workflow.success ? "SUCCESS" : "FAILURE"}
+    - Output directory: ${params.outdir_first_stage}
     
-    Les rapports MultiQC ont été organisés dans:
+    MultiQC reports have been organized in:
     [GSE]/multiqc/multiqc_report.html
     =================================================================
     """
