@@ -51,40 +51,66 @@ def create_initial_channels() {
         .transpose(by: 1)
 }
 
-// Auxiliary functions to get file paths
+// Helper function for Bowtie FASTA paths
 def getFastaPathBowtie(type) {
-    switch(type.toUpperCase()) {
-        case 'HS': return params.path_fasta_HS_B
-        case 'CE': return params.path_fasta_CE_B
-        case 'DM': return params.path_fasta_DM_B
-        case 'SC': return params.path_fasta_SC_B
-        case 'DR': return params.path_fasta_DR_B
-        case 'SM': return params.path_fasta_SM_B
-        default: throw new RuntimeException("Unrecognized type: ${type}")
+    def upperType = type.toUpperCase()
+    
+    if (upperType == 'HS') {
+        return params.path_fasta_HS_B
+    } else if (upperType == 'CE') {
+        return params.path_fasta_CE_B
+    } else if (upperType == 'DM') {
+        return params.path_fasta_DM_B
+    } else if (upperType == 'SC') {
+        return params.path_fasta_SC_B
+    } else if (upperType == 'DR') {
+        return params.path_fasta_DR_B
+    } else if (upperType == 'SM') {
+        return params.path_fasta_SM_B
+    } else {
+        throw new RuntimeException("Unrecognized type: ${type}")
     }
 }
 
+// Helper function for STAR FASTA paths
 def getFastaPathStar(type) {
-    switch(type.toUpperCase()) {
-        case 'HS': return params.path_fasta_HS
-        case 'CE': return params.path_fasta_CE
-        case 'DM': return params.path_fasta_DM
-        case 'SC': return params.path_fasta_SC
-        case 'DR': return params.path_fasta_DR
-        case 'SM': return params.path_fasta_SM
-        default: throw new RuntimeException("Unrecognized type: ${type}")
+    def upperType = type.toUpperCase()
+    
+    if (upperType == 'HS') {
+        return params.path_fasta_HS
+    } else if (upperType == 'CE') {
+        return params.path_fasta_CE
+    } else if (upperType == 'DM') {
+        return params.path_fasta_DM
+    } else if (upperType == 'SC') {
+        return params.path_fasta_SC
+    } else if (upperType == 'DR') {
+        return params.path_fasta_DR
+    } else if (upperType == 'SM') {
+        return params.path_fasta_SM
+    } else {
+        throw new RuntimeException("Unrecognized type: ${type}")
     }
 }
 
+// Helper function for GTF paths
 def getGtfPath(type) {
-    switch(type.toUpperCase()) {
-        case 'HS': return params.path_fasta_HS_GTF
-        case 'CE': return params.path_fasta_CE_GTF
-        case 'DM': return params.path_fasta_DM_GTF
-        case 'SC': return params.path_fasta_SC_GTF
-        case 'DR': return params.path_fasta_DR_GTF
-        case 'SM': return params.path_fasta_SM_GTF
-        default: throw new RuntimeException("Unrecognized type: ${type}")
+    def upperType = type.toUpperCase()
+    
+    if (upperType == 'HS') {
+        return params.path_fasta_HS_GTF
+    } else if (upperType == 'CE') {
+        return params.path_fasta_CE_GTF
+    } else if (upperType == 'DM') {
+        return params.path_fasta_DM_GTF
+    } else if (upperType == 'SC') {
+        return params.path_fasta_SC_GTF
+    } else if (upperType == 'DR') {
+        return params.path_fasta_DR_GTF
+    } else if (upperType == 'SM') {
+        return params.path_fasta_SM_GTF
+    } else {
+        throw new RuntimeException("Unrecognized type: ${type}")
     }
 }
 
@@ -377,8 +403,7 @@ workflow {
             checkFastqExists(it[0], it[1], it[2], it[3], it[5])
         }
         .map { gse, gsm, drug, bio, trim, sp, type ->
-            def outputPath = "${params.input_output_fastq_second_stage
-        }/${gse}_${drug}_${bio}/${gsm}/trimmed"
+            def outputPath = "${params.input_output_fastq_second_stage}/${gse}_${drug}_${bio}/${gsm}/trimmed"
             if (sp.toLowerCase() == "paired") {
                 def fastq1 = file("${outputPath}/${gsm}_1_val_1.fq") // to be modified to /${gsm}_1_trimmed.fq so the first stage needs to be adapted
                 def fastq2 = file("${outputPath}/${gsm}_2_val_2.fq")
@@ -519,48 +544,48 @@ workflow {
 }
 
 
-// Mise à jour de la section onComplete
-workflow.onComplete {
-    // Comptabiliser les résultats
-    def bowtie_count = 0
-    def star_count = 0
-    def transcriptome_count = 0
+// // Mise à jour de la section onComplete
+// workflow.onComplete {
+//     // Comptabiliser les résultats
+//     def bowtie_count = 0
+//     def star_count = 0
+//     def transcriptome_count = 0
     
-    // Vérifier les fichiers de sortie Bowtie
-    def bowtie_dir = new File("${params.outdir_stage_stage}/bowtie")
-    if (bowtie_dir.exists()) {
-        bowtie_count = bowtie_dir.listFiles().findAll { it.isDirectory() }.size()
-    }
+//     // Vérifier les fichiers de sortie Bowtie
+//     def bowtie_dir = new File("${params.outdir_stage_stage}/bowtie")
+//     if (bowtie_dir.exists()) {
+//         bowtie_count = bowtie_dir.listFiles().findAll { it.isDirectory() }.size()
+//     }
     
-    // Vérifier les fichiers de sortie STAR
-    def star_dir = new File("${params.outdir_stage_stage}/STAR")
-    if (star_dir.exists()) {
-        star_count = star_dir.listFiles().findAll { it.isDirectory() }.size()
+//     // Vérifier les fichiers de sortie STAR
+//     def star_dir = new File("${params.outdir_stage_stage}/STAR")
+//     if (star_dir.exists()) {
+//         star_count = star_dir.listFiles().findAll { it.isDirectory() }.size()
         
-        // Compter les fichiers transcriptome
-        transcriptome_count = 0
-        star_dir.eachFileRecurse { file ->
-            if (file.name.endsWith("Aligned.toTranscriptome.out.bam")) {
-                transcriptome_count++
-            }
-        }
-    }
+//         // Compter les fichiers transcriptome
+//         transcriptome_count = 0
+//         star_dir.eachFileRecurse { file ->
+//             if (file.name.endsWith("Aligned.toTranscriptome.out.bam")) {
+//                 transcriptome_count++
+//             }
+//         }
+//     }
     
-    log.info """
-    Pipeline execution summary
-    -------------------------
-    Completed at: ${workflow.complete}
-    Duration    : ${workflow.duration}
-    Success     : ${workflow.success}
-    workDir     : ${workflow.workDir}
-    exit status : ${workflow.exitStatus}
+//     log.info """
+//     Pipeline execution summary
+//     -------------------------
+//     Completed at: ${workflow.complete}
+//     Duration    : ${workflow.duration}
+//     Success     : ${workflow.success}
+//     workDir     : ${workflow.workDir}
+//     exit status : ${workflow.exitStatus}
     
-    Results:
-    --------
-    Bowtie alignment completed: $bowtie_count échantillons
-    STAR alignment completed: $star_count échantillons
-    Transcriptome alignments: $transcriptome_count fichiers
+//     Results:
+//     --------
+//     Bowtie alignment completed: $bowtie_count échantillons
+//     STAR alignment completed: $star_count échantillons
+//     Transcriptome alignments: $transcriptome_count fichiers
     
-    Output directory: ${params.outdir_stage_stage}
-    """
-}
+//     Output directory: ${params.outdir_stage_stage}
+//     """
+// }

@@ -3,15 +3,7 @@
 params.outdir_first_stage = "/path/to/first_stage/output/directory"
 params.multiqc_config = "/path/to/Ribotie_nextflow_pipeline/multiqc_custom_config.yaml"
 
-log.info """\
-=================================================================
-MultiQC by GSE - Nextflow Pipeline (Folder Organization)
-=================================================================
-Input directory      : ${params.outdir_first_stage}
-Output directory     : ${params.outdir_first_stage}
-MultiQC Config       : ${params.multiqc_config}
-=================================================================
-"""
+
 
 // Find all GSE directories
 process FIND_GSE_DIRS {
@@ -61,6 +53,15 @@ process RUN_MULTIQC {
 }
 
 workflow {
+    log.info """\
+    =================================================================
+    MultiQC by GSE - Nextflow Pipeline (Folder Organization)
+    =================================================================
+    Input directory      : ${params.outdir_first_stage}
+    Output directory     : ${params.outdir_first_stage}
+    MultiQC Config       : ${params.multiqc_config}
+    =================================================================
+    """
     // Find all GSE directories
     FIND_GSE_DIRS()
     
@@ -75,17 +76,17 @@ workflow {
 }
 
 // End notification and summary
-workflow.onComplete {
-    log.info """
-    =================================================================
-    Execution completed!
+// workflow.onComplete {
+//     log.info """
+//     =================================================================
+//     Execution completed!
     
-    Summary:
-    - Status: ${workflow.success ? "SUCCESS" : "FAILURE"}
-    - Output directory: ${params.outdir_first_stage}
+//     Summary:
+//     - Status: ${workflow.success ? "SUCCESS" : "FAILURE"}
+//     - Output directory: ${params.outdir_first_stage}
     
-    MultiQC reports have been organized in:
-    [GSE]/multiqc/multiqc_report.html
-    =================================================================
-    """
-}
+//     MultiQC reports have been organized in:
+//     [GSE]/multiqc/multiqc_report.html
+//     =================================================================
+//     """
+// }

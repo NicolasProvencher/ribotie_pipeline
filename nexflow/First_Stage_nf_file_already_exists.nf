@@ -223,10 +223,11 @@ process FASTQC_POST {
     }
 }
 
-log.info "Starting pipeline for existing files only..."
+
 
 // Main workflow
 workflow {
+    log.info "Starting pipeline for existing files only..."
     // Create initial channel
     def csvChannelPerGsm = create_initial_channels()
     
@@ -276,14 +277,14 @@ workflow {
     FASTQC_POST(trimmed_files)
 }
 
-workflow.onComplete {
-    log.info """
-    Pipeline execution summary
-    -------------------------
-    Completed at: ${workflow.complete}
-    Duration    : ${workflow.duration}
-    Success     : ${workflow.success}
-    workDir     : ${workflow.workDir}
-    exit status : ${workflow.exitStatus}
-    """
-}
+// workflow.onComplete {
+//     log.info """
+//     Pipeline execution summary
+//     -------------------------
+//     Completed at: ${workflow.complete}
+//     Duration    : ${workflow.duration}
+//     Success     : ${workflow.success}
+//     workDir     : ${workflow.workDir}
+//     exit status : ${workflow.exitStatus}
+//     """
+// }

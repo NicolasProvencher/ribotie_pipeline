@@ -1,17 +1,20 @@
 #!/usr/bin/env nextflow
 
-if (!params.outdir_first_stage) {
-    log.error "Veuillez spécifier le chemin du dossier pipeline_output_complet avec --outdir_first_stage"
-    log.error "Please specify the pipeline_output_complet directory path with --outdir_first_stage"
-    exit 1
-}
+process validate_outdir_first_stage {
+    when:
+    !params.outdir_first_stage
 
-// Processus pour collecter et renommer les rapports MultiQC
+    script:
+    """
+    echo "Please specify the pipeline_output_complet directory path with --outdir_first_stage" >&2
+    exit 1
+    """
+}
 // Process to collect and rename MultiQC reports
 process COLLECT_MULTIQC_REPORTS {
     publishDir "${params.outdir_first_stage}/multiqc_rapport_complet", mode: 'copy', overwrite: true
     
-    outdir_first_stage:
+    input:
     tuple val(gse_name), path(multiqc_report)
     
     output:
@@ -24,6 +27,7 @@ process COLLECT_MULTIQC_REPORTS {
 }
 
 workflow {
+    validate_outdir_first_stage()
     // Création du canal pour les rapports MultiQC
     // Creation of the channel for MultiQC reports
     Channel
@@ -39,18 +43,14 @@ workflow {
     COLLECT_MULTIQC_REPORTS(multiqc_reports)
 }
 
-workflow.onComplete {
-    log.info """
-    Pipeline terminé avec succès!
-    Les rapports MultiQC ont été copiés dans le dossier multiqc_rapport_complet
-    Pipeline completed successfully!
-    MultiQC reports have been copied to the multiqc_rapport_complet folder
-    """
-}
+// workflow.onComplete {
+//     log.info """
+//     Pipeline completed successfully!
+//     MultiQC reports have been copied to the multiqc_rapport_complet folder
+//     """
+// }
 
-workflow.onError {
-    log.error "Une erreur est survenue lors de l'exécution du pipeline"
-    log.error "An error occurred during pipeline execution"
-    log.error "Erreur: ${workflow.errorMessage}"
-    log.error "Error: ${workflow.errorMessage}"
-}
+// workflow.onError {
+//     log.error "An error occurred during pipeline execution"
+//     log.error "Error: ${workflow.errorMessage}"
+// }

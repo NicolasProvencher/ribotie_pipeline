@@ -4,35 +4,51 @@
 nextflow.enable.dsl = 2
 
 // Specific parameters for RiboTIE
-// params.star_dir = '/home/ilyass09/scratch/riboseq_pipeline/Second_Stage_copy/HS/STAR'
-// params.input_csv = '/home/ilyass09/scratch/riboseq_pipeline/Samples_sheet/test.csv'
-// params.outdir_ribotie = '/home/ilyass09/scratch/riboseq_pipeline/Ribotie_complet'
-// params.ribotie_dir = '/home/ilyass09/scratch/riboseq_pipeline/ribotie'
+// params.star_dir = '/path/to/star/pipeline/directory/STAR'
+// params.input_csv = '/path/to/pipeline/Samples_sheet/test.csv'
+// params.outdir_ribotie = '/path/to/ribotie/output/directory'
+// params.ribotie_dir = '/path/to/ribotie/directory'
 
 // params.ignore_ribotie_errors = true
 
 // Helper functions to get file paths
 def getFastaPath(type) {
-    switch(type.toUpperCase()) {
-        case 'HS': return params.path_fasta_HS
-        case 'CE': return params.path_fasta_CE
-        case 'DM': return params.path_fasta_DM
-        case 'SC': return params.path_fasta_SC
-        case 'DR': return params.path_fasta_DR
-        case 'SM': return params.path_fasta_SM
-        default: throw new RuntimeException("Unrecognized type: ${type}")
+    def upperType = type.toUpperCase()
+    
+    if (upperType == 'HS') {
+        return params.path_fasta_HS
+    } else if (upperType == 'CE') {
+        return params.path_fasta_CE
+    } else if (upperType == 'DM') {
+        return params.path_fasta_DM
+    } else if (upperType == 'SC') {
+        return params.path_fasta_SC
+    } else if (upperType == 'DR') {
+        return params.path_fasta_DR
+    } else if (upperType == 'SM') {
+        return params.path_fasta_SM
+    } else {
+        throw new RuntimeException("Unrecognized type: ${type}")
     }
 }
 
 def getGtfPath(type) {
-    switch(type.toUpperCase()) {
-        case 'HS': return params.path_fasta_HS_GTF
-        case 'CE': return params.path_fasta_CE_GTF
-        case 'DM': return params.path_fasta_DM_GTF
-        case 'SC': return params.path_fasta_SC_GTF
-        case 'DR': return params.path_fasta_DR_GTF
-        case 'SM': return params.path_fasta_SM_GTF
-        default: throw new RuntimeException("Unrecognized type: ${type}")
+    def upperType = type.toUpperCase()
+    
+    if (upperType == 'HS') {
+        return params.path_fasta_HS_GTF
+    } else if (upperType == 'CE') {
+        return params.path_fasta_CE_GTF
+    } else if (upperType == 'DM') {
+        return params.path_fasta_DM_GTF
+    } else if (upperType == 'SC') {
+        return params.path_fasta_SC_GTF
+    } else if (upperType == 'DR') {
+        return params.path_fasta_DR_GTF
+    } else if (upperType == 'SM') {
+        return params.path_fasta_SM_GTF
+    } else {
+        throw new RuntimeException("Unrecognized type: ${type}")
     }
 }
 
@@ -144,21 +160,21 @@ process CREATE_GSE_YAML {
     mkdir -p ${h5_dir}
     
     cat > ${gse}_${drug}_${bio}.yml << EOF
-gtf_path: ${gtf_path}
-fa_path: ${fa_path}
+    gtf_path: ${gtf_path}
+    fa_path: ${fa_path}
 
-ribo_paths:
-${ribo_paths_str}
+    ribo_paths:
+    ${ribo_paths_str}
 
-${samples_str}
-h5_path: ${h5_dir}/${gse}_${drug}_${bio}.h5
+    ${samples_str}
+    h5_path: ${h5_dir}/${gse}_${drug}_${bio}.h5
 
-out_dir: ${params.outdir_ribotie}/${gse}_${drug}_${bio}/results
-EOF
-    
-    # Copy file explicitly if needed
-    cp ${gse}_${drug}_${bio}.yml ${params.outdir_ribotie}/${gse}_${drug}_${bio}/
-    """
+    out_dir: ${params.outdir_ribotie}/${gse}_${drug}_${bio}/results
+    EOF
+        
+        # Copy file explicitly if needed
+        cp ${gse}_${drug}_${bio}.yml ${params.outdir_ribotie}/${gse}_${drug}_${bio}/
+        """
 }
 
 // Process to run RiboTIE on each GSE YAML file
