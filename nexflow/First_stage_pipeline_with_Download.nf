@@ -52,32 +52,6 @@ def checkFastqcPostExists(gse, gsm, drug, bio, sp) {
     }
 }
 
-// Définition des channels avec vérification
-
-def create_initial_channels() {
-    def csvChannelPerLigne = Channel
-        .fromPath(params.input_csv)
-        .splitCsv(header: true)
-        .map { row -> tuple(
-            row.Study_accession,
-            row.Sample_accession,
-            row.Drug,
-            row.Biological_type,
-            row.Trim_arg,
-            row.S_P_type
-        )}
-
-    return csvChannelPerLigne
-        .map { gse, gsm, drug, bio, trim, sp -> tuple(
-            gse,
-            gsm.split(';').collect{it.trim()},
-            drug,
-            bio,
-            trim,
-            sp
-        )}
-        .transpose(by: 1)
-}
 
 
 process FASTQ_DUMP {
@@ -226,23 +200,22 @@ process FASTQC_POST {
 workflow {
     log.info "Starting pipeline..."
     // Créer le channel initial
-    def csvChannelPerGsm = create_initial_channels()
-    
+    def csvChannelPerGsm = Channel
+        .fromPath(params.input_csv)
+        .splitCsv(header: true)
+        .map { row -> [
+            GSE: row.Study_accession,
+            GSM: row.Sample_accession.split(';').collect{it.trim()},
+            drug: row.Drug,
+            riboseq_type: row.Biological_type,
+            trimming_args: row.Trim_arg,
+            paired_end: row.paired_end.toBoolean(),
+            sp: row.Species
+        ]}.transpose(by: 1).view()
+
     // Download des fichiers fastq
     FASTQ_DUMP(csvChannelPerGsm)
-    
-    // Création d'un channel pour les fichiers existants
-    def existing_fastq_files = csvChannelPerGsm
-        .filter { gse, gsm, drug, bio, trim, sp ->
-            checkFastqExists(gse, gsm, drug, bio, sp)
-        }
-        .map { gse, gsm, drug, bio, trim, sp ->
-            def outputPath = "${params.outdir_first_stage}/${gse}_${drug}_${bio}/${gsm}"
-            def fastqFiles = sp.toLowerCase() == "paired" ?
-                [file("${outputPath}/${gsm}_1.fastq"), file("${outputPath}/${gsm}_2.fastq")] :
-                file("${outputPath}/${gsm}.fastq")
-            tuple(gse, gsm, drug, bio, trim, sp, fastqFiles)
-        }
+
     
 
     // def combined_fastq_files = FASTQ_DUMP.out.fastq_files.mix(existing_fastq_files)
