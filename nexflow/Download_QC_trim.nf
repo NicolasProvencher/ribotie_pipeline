@@ -3,8 +3,8 @@
 // everything works well but I need to verify the MultiQC to ensure everything is good like the trim
 
 // Define parameters
-params.outdir_file_exist_already = "/path/to/directory/containing/fastq"
-params.outdir = "/path/to/trim/output/directory"
+params.fastq_dir = "/path/to/directory/containing/new/fastq"
+params.pipeline_dir = "/path/to/trim/output/directory"
 params.input_csv = "/path/to/samplesheet/directory/samplesheet.csv"
 params.max_retries = 3
 
@@ -12,7 +12,7 @@ process FASTQ_DUMP {
     maxRetries params.max_retries
     // maxForks 1  // Limit parallel execution to 5 concurrent jobs
     tag "$meta.GSM"
-    publishDir "${params.outdir_first_stage}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}", mode: 'copy'
+    publishDir "${params.fastq_dir}", mode: 'copy'
 
     input:
     val (meta)
@@ -30,11 +30,10 @@ process FASTQ_DUMP {
     """
 }
 
-// TODO: add template to fastqc to split pre and post fastqc
 // Process for FASTQC_PRE
 process FASTQC_PRE {
     tag "$meta.GSM"
-    publishDir "${params.outdir}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/fastqc_pre", mode: 'copy'
+    publishDir "${params.pipeline_dir}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/fastqc_pre", mode: 'copy'
     errorStrategy 'retry'
     maxRetries params.max_retries
 
@@ -46,7 +45,7 @@ process FASTQC_PRE {
     tuple path("*.html") , path("*.zip"), emit : files
 
     script:
-    def reads = meta.sp ? "${meta.GSM}_1.fastq ${meta.GSM}_2.fastq" : "${meta.GSM}.fastq"
+    def reads = meta.sp ? "${params.fastq_dir}/${meta.GSM}_1.fastq ${params.fastq_dir}/${meta.GSM}_2.fastq" : "${params.fastq_dir}/${meta.GSM}.fastq"
         """
         echo "[INFO] FASTQC_PRE : Starting fastqc of GSM: ${meta.GSM}"
         fastqc --quiet ${reads}
@@ -58,7 +57,7 @@ process FASTQC_PRE {
 // TODO fix the output of the trim galore in the process
 process TRIM_GALORE {
     tag "$meta.GSM"
-    publishDir "${params.outdir}/${meta.sp}/${meta.gse}_${meta.drug}_${meta.sample_type}/${meta.GSM}/trimmed", mode: 'copy'
+    publishDir "${params.pipeline_dir}/trimmed", mode: 'copy'
     errorStrategy 'ignore'
 
     input:
@@ -66,15 +65,14 @@ process TRIM_GALORE {
 
     output:
     val(meta), emit: meta
-    path("*.trim.fq"), emit: trimmed
-    path "*_trimming_report.txt"
+    path("${meta.GSM}*.trim.fq"), emit: trimmed
+    path "${meta.GSM}*_trimming_report.txt"
 
     script:
-    def files  = meta.sp ? "${meta.GSM}_1 ${meta.GSM}_2" : "${meta.GSM}_1"
+    def files  = meta.sp ? "-- paired ${params.fastq_dir}/${meta.GSM}_1 ${params.fastq_dir}/${meta.GSM}_2" : "${params.fastq_dir}/${meta.GSM}"
     """
     echo "[INFO] TRIM_GALORE_PAIRED : Starting trim of GSM: ${meta.GSM}"
     trim_galore \
-    --paired \
     --fastqc \
     --trim-n \
     --length 20 \
@@ -88,7 +86,7 @@ process TRIM_GALORE {
 
 process FASTQC_POST {
     tag "$meta.GSM"
-    publishDir "${params.outdir}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/fastqc_post", mode: 'copy'
+    publishDir "${params.pipeline_dir}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/fastqc_post", mode: 'copy'
     errorStrategy 'ignore'
 
     input:
@@ -108,7 +106,7 @@ process FASTQC_POST {
 // TODO add multiqc template to split pre and post fastqc
 process MULTIQC {
     tag "multiqc"
-    publishDir "${params.outdir}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/multiqc", mode: 'copy'
+    publishDir "${params.pipeline_dir}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/multiqc", mode: 'copy'
     errorStrategy 'ignore'
 
     input:
@@ -120,7 +118,7 @@ process MULTIQC {
     script:
     """
     echo "[INFO] MULTIQC : Starting MultiQC report generation"
-    multiqc --force -o ${params.outdir}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type} ${params.outdir}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}
+    multiqc -o ${params.pipeline_dir}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type} ${params.pipeline_dir}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}
     echo "[SUCCESS] MULTIQC : MultiQC report generated"
     """
 }
@@ -130,9 +128,10 @@ process MULTIQC {
 // Main workflow
 workflow {
     log.info "Starting pipeline for existing files only..."
-    // Channel that check for previously downloaded fastqs 
+    // Channel that check for previously downloaded fastqs
+    //TODO add a 2nd path to check for the old fastq files 
     Channel
-        .fromPath("${params.pipeline_file_dir_file_exist_already}/*.f*")
+        .fromPath(["${params.fastq_dir}/*.f*"])
         .map { file -> 
             file.simpleName.replaceFirst(/_[12]$/, '')
         }
