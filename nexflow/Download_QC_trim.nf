@@ -1,25 +1,13 @@
-#!/usr/bin/env nextflow
-// In this part
-// everything works well but I need to verify the MultiQC to ensure everything is good like the trim
-
-// Define parameters
-params.fastq_dir = "/path/to/directory/containing/new/fastq"
-params.pipeline_dir = "/path/to/trim/output/directory"
-params.input_csv = "/path/to/samplesheet/directory/samplesheet.csv"
-params.max_retries = 3
-
 process FASTQ_DUMP {
-    maxRetries params.max_retries
-    // maxForks 1  // Limit parallel execution to 5 concurrent jobs
     tag "$meta.GSM"
-    publishDir "${params.fastq_dir}", mode: 'copy'
+    publishDir "${params.fastq_dir}", mode: 'link'
 
     input:
     val (meta)
     
     output:
     val (meta), emit: meta
-    path("${meta.GSM}*.fastq"), emit: fastq_files
+    path("${meta.GSM}*.fastq"), emit: fastq_file
 
     script:
     """
@@ -33,9 +21,7 @@ process FASTQ_DUMP {
 // Process for FASTQC_PRE
 process FASTQC_PRE {
     tag "$meta.GSM"
-    publishDir "${params.pipeline_dir}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/fastqc_pre", mode: 'copy'
-    errorStrategy 'retry'
-    maxRetries params.max_retries
+    publishDir "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/fastqc_pre", mode: 'link'
 
     input:
     val (meta)
@@ -44,11 +30,15 @@ process FASTQC_PRE {
     val (meta), emit : meta
     tuple path("*.html") , path("*.zip"), emit : files
 
+    conda "fastqc"
+
     script:
-    def reads = meta.sp ? "${params.fastq_dir}/${meta.GSM}_1.fastq ${params.fastq_dir}/${meta.GSM}_2.fastq" : "${params.fastq_dir}/${meta.GSM}.fastq"
+    def reads = meta.paired_end ? "${params.fastq_dir}/${meta.GSM}_1.fastq ${params.fastq_dir}/${meta.GSM}_2.fastq" : "${params.fastq_dir}/${meta.GSM}.fastq"
         """
         echo "[INFO] FASTQC_PRE : Starting fastqc of GSM: ${meta.GSM}"
-        fastqc --quiet ${reads}
+        pwd
+        echo "fastqc -o \$(pwd) ${reads}"
+        fastqc -o \$(pwd) ${reads}
         echo "[SUCCESS] FASTQC_PRE : fastqc GSM: ${meta.GSM}"
         """
 }
@@ -57,27 +47,29 @@ process FASTQC_PRE {
 // TODO fix the output of the trim galore in the process
 process TRIM_GALORE {
     tag "$meta.GSM"
-    publishDir "${params.pipeline_dir}/trimmed", mode: 'copy'
-    errorStrategy 'ignore'
+    publishDir "${params.path_pipeline_directory}/trimmed", mode: 'link'
+    publishDir "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/trimmed", mode: 'link'
 
     input:
     val(meta)
 
     output:
     val(meta), emit: meta
-    path("${meta.GSM}*.trim.fq"), emit: trimmed
-    path "${meta.GSM}*_trimming_report.txt"
+    path("${meta.GSM}*_trimmed.fq"), emit: trimmed
+    path("${meta.GSM}*_trimming_report.txt")
+
+    conda "trim-galore"
 
     script:
-    def files  = meta.sp ? "-- paired ${params.fastq_dir}/${meta.GSM}_1 ${params.fastq_dir}/${meta.GSM}_2" : "${params.fastq_dir}/${meta.GSM}"
+    def files  = meta.paired_end ? "-- paired ${params.fastq_dir}/${meta.GSM}_1.fastq ${params.fastq_dir}/${meta.GSM}_2.fastq" : "${params.fastq_dir}/${meta.GSM}.fastq"
+    def trimming_arg = meta.trimming_arg ?: "" 
     """
     echo "[INFO] TRIM_GALORE_PAIRED : Starting trim of GSM: ${meta.GSM}"
     trim_galore \
-    --fastqc \
     --trim-n \
     --length 20 \
     --quality 25 \
-    ${meta.trimming_arg} \
+    ${trimming_arg} \
     ${files}
     echo "[SUCCESS] TRIM_GALORE_PAIRED : Completed GSM: ${meta.GSM}"
     """
@@ -86,28 +78,29 @@ process TRIM_GALORE {
 
 process FASTQC_POST {
     tag "$meta.GSM"
-    publishDir "${params.pipeline_dir}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/fastqc_post", mode: 'copy'
-    errorStrategy 'ignore'
+    publishDir "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/fastqc_post", mode: 'link'
 
     input:
-    tuple val(meta), val(trim)
+    val(meta)
+    val(trim)
 
     output:
     val (meta), emit : meta
-    path("*.html"), path("*.zip"), emit: files
+    tuple path("*.html"), path("*.zip"), emit: files
+
+    conda "fastqc"
 
     script:
         """
         echo "[INFO] FASTQC_POST : Starting fastqc of GSM: ${meta.GSM}"   
-        fastqc --quiet ${trim}
+        fastqc -o \$(pwd) ${trim}
         echo "[SUCCESS] FASTQC_POST : Downloaded GSM: ${meta.GSM}"     
         """
 }
 // TODO add multiqc template to split pre and post fastqc
 process MULTIQC {
     tag "multiqc"
-    publishDir "${params.pipeline_dir}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/multiqc", mode: 'copy'
-    errorStrategy 'ignore'
+    publishDir "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/multiqc", mode: 'link'
 
     input:
     val (meta)
@@ -115,10 +108,12 @@ process MULTIQC {
     output:
     path("multiqc_report.html"), emit: multiqc_report
 
+    conda "multiqc"
+
     script:
     """
     echo "[INFO] MULTIQC : Starting MultiQC report generation"
-    multiqc -o ${params.pipeline_dir}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type} ${params.pipeline_dir}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}
+    multiqc -o \$(pwd) ${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}
     echo "[SUCCESS] MULTIQC : MultiQC report generated"
     """
 }
@@ -172,10 +167,10 @@ workflow {
     TRIM_GALORE(all_samples)
     FASTQC_PRE(all_samples)
     TRIM_GALORE.out.meta.view { "TRIM_GALORE output: $it" }
-    FASTQC_POST(TRIM_GALORE.out.meta)
+    FASTQC_POST(TRIM_GALORE.out.meta, TRIM_GALORE.out.trimmed)
 
     // regrouping channels to run multiqc on a multitude of sample fomr the same study
-    TRIM_GALORE.out.meta
+    FASTQC_POST.out.meta
         .map { item -> [item.GSE + "_" + item.drug + '_' + item.sample_type, item] }
         .groupTuple()
         .map { key, items -> [
@@ -190,17 +185,3 @@ workflow {
 
     MULTIQC(collapsed_ch)
 }
-// add a way to log what failed
-
-
-// workflow.onComplete {
-//     log.info """
-//     Pipeline execution summary
-//     -------------------------
-//     Completed at: ${workflow.complete}
-//     Duration    : ${workflow.duration}
-//     Success     : ${workflow.success}
-//     workDir     : ${workflow.workDir}
-//     exit status : ${workflow.exitStatus}
-//     """
-// }
