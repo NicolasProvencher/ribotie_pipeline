@@ -21,7 +21,7 @@ process FASTQ_DUMP {
 // Process for FASTQC_PRE
 process FASTQC_PRE {
     tag "$meta.GSM"
-    publishDir "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/fastqc_pre", mode: 'link'
+    publishDir "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/fastqc_pre", mode: 'link', overwrite: true
 
     input:
     val (meta)
@@ -47,8 +47,9 @@ process FASTQC_PRE {
 // TODO fix the output of the trim galore in the process
 process TRIM_GALORE {
     tag "$meta.GSM"
-    publishDir "${params.path_pipeline_directory}/trimmed", mode: 'link'
-    publishDir "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/trimmed", mode: 'link'
+    publishDir "${params.path_pipeline_directory}/trimmed", mode: 'link', overwrite: true
+
+    publishDir "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/trimmed", mode: 'link', overwrite: true
 
     input:
     val(meta)
@@ -62,9 +63,10 @@ process TRIM_GALORE {
 
     script:
     def files  = meta.paired_end ? "-- paired ${params.fastq_dir}/${meta.GSM}_1.fastq ${params.fastq_dir}/${meta.GSM}_2.fastq" : "${params.fastq_dir}/${meta.GSM}.fastq"
-    def trimming_arg = meta.trimming_arg ?: "" 
+    def trimming_arg = meta.trimming_args ?: "" 
     """
     echo "[INFO] TRIM_GALORE_PAIRED : Starting trim of GSM: ${meta.GSM}"
+    echo "Trimming arguments: ${trimming_arg}, meta.trimming_args: ${meta.trimming_args}"
     trim_galore \
     --trim-n \
     --length 20 \
@@ -78,7 +80,7 @@ process TRIM_GALORE {
 
 process FASTQC_POST {
     tag "$meta.GSM"
-    publishDir "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/fastqc_post", mode: 'link'
+    publishDir "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/fastqc_post", mode: 'link', overwrite: true
 
     input:
     val(meta)
@@ -100,7 +102,7 @@ process FASTQC_POST {
 // TODO add multiqc template to split pre and post fastqc
 process MULTIQC {
     tag "multiqc"
-    publishDir "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/multiqc", mode: 'link'
+    publishDir "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/multiqc", mode: 'link', overwrite: true
 
     input:
     val (meta)
@@ -113,7 +115,7 @@ process MULTIQC {
     script:
     """
     echo "[INFO] MULTIQC : Starting MultiQC report generation"
-    multiqc -o \$(pwd) ${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}
+    multiqc -o \$(pwd) -c ${params.multiqc_config} ${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}
     echo "[SUCCESS] MULTIQC : MultiQC report generated"
     """
 }
