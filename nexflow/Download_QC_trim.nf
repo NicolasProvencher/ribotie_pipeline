@@ -47,7 +47,7 @@ process FASTQC_PRE {
 // TODO fix the output of the trim galore in the process
 process TRIM_GALORE {
     tag "$meta.GSM"
-    publishDir "${params.path_pipeline_directory}/trimmed", mode: 'link', overwrite: true
+    publishDir "${params.trimmed_fastq_dir}", mode: 'link', overwrite: true
 
     publishDir "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/trimmed", mode: 'link', overwrite: true
 
