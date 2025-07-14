@@ -34,7 +34,7 @@ process BOWTIE_ALIGN {
 }
 
 process STAR_ALIGN {
-    beforeScript 'module load star'  
+    beforeScript '''module load star'''  
     tag "${gsm}"
     publishDir "${params.outdir_stage_stage}/STAR/${gse}_${drug}_${bio}/${gsm}", mode: 'link'
        
@@ -67,6 +67,86 @@ process STAR_ALIGN {
          --outWigType bedGraph
     """
 }
+
+//TODO replace yml with actual arguments to simplify workflow
+//TODO refer to the gtf and fasta using params.var[species]
+//TODO arrange this for once per file
+//TODO correclty output the h5 db
+
+process RUN_RIBOTIE_DATA {
+    tag "${gse}_${drug}_${bio}"
+    
+    // Use appropriate resources
+    // cpus 8
+    // memory '80 GB * ${task.attempt}'
+    // time '24h'
+    // maxRetries 3
+    beforeScript 'module load python cuda cudnn arrow '
+    // clusterOptions = '--account=rrg-xroucou'
+    
+    // Publish results
+    publishDir "${params.outdir_ribotie}/${gse}_${drug}_${bio}/results_data", mode: 'copy'
+    // errorStrategy { params.ignore_ribotie_errors ? 'ignore' : 'retry' }
+    
+    input:
+    tuple val(meta), path(aligned_transcriptome)
+    
+    output:
+    val(meta) emit: meta
+    val(aligned_transcriptome), emit: aligned_transcriptome
+    path("ribotie_data_log.txt")
+    
+    script:
+    """
+    # Prepare the environment
+    export PATH="\$PATH:${params.ribotie_dir}/bin"
+    virtualenv --no-download \$SLURM_TMPDIR/env
+    source \$SLURM_TMPDIR/env/bin/activate
+    pip install --no-index transcript_transformer
+    
+    # Run RiboTIE with the YAML file as template
+    ribotie ${yaml_file} --data > ribotie_data_log.txt 2>&1
+
+    """
+}
+
+// TODO correctly publish the csv results and the wieghts i guess, nah fuck the weights
+process RUN_RIBOTIE {
+    tag "${gse}_${drug}_${bio}"
+     // Use appropriate resources
+    // cpus 8
+    // memory '60 GB'
+    // time '24h'
+    // maxRetries 2
+    beforeScript 'module load python/3.9 cuda cudnn arrow'
+    // clusterOptions = '--account=def-xroucou --gres=gpu:1'
+    // Publish results
+    publishDir "${params.outdir_ribotie}/${gse}_${drug}_${bio}/results_run", mode: 'copy'
+    // errorStrategy { params.ignore_ribotie_errors ? 'ignore' : 'retry' }
+     
+    input:
+    tuple val(gse), val(drug), val(bio), path(yaml_file)
+    
+    output:
+    tuple val(gse), val(drug), val(bio), path("*.csv"), emit: ribotie_results 
+    path("ribotie_log.txt")
+    
+    script:
+    """
+    # Prepare the environment
+    export PATH="\$PATH:${params.ribotie_dir}/bin"
+    virtualenv --no-download \$SLURM_TMPDIR/env
+    source \$SLURM_TMPDIR/env/bin/activate
+    pip install --no-index transcript_transformer
+    
+    # Run RiboTIE with the YAML file as template
+    ribotie ${yaml_file}  > ribotie_log.txt 2>&1
+
+    """
+}
+
+
+
 
 workflow {
     Channel

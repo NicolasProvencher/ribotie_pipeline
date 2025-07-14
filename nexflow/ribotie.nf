@@ -14,7 +14,7 @@ process RUN_RIBOTIE_DATA {
     // memory '80 GB * ${task.attempt}'
     // time '24h'
     // maxRetries 3
-    beforeScript 'module load python/3.9 cuda cudnn arrow'
+    beforeScript 'module load python cuda cudnn arrow'
     // clusterOptions = '--account=def-xroucou --gres=gpu:1'
     
     // Publish results
@@ -49,8 +49,8 @@ process RUN_RIBOTIE {
     // time '24h'
     // maxRetries 2
     beforeScript 'module load python/3.9 cuda cudnn arrow'
-    clusterOptions = '--account=def-xroucou --gres=gpu:1'
-     // Publish results
+    // clusterOptions = '--account=def-xroucou --gres=gpu:1'
+    // Publish results
     publishDir "${params.outdir_ribotie}/${gse}_${drug}_${bio}/results_run", mode: 'copy'
     // errorStrategy { params.ignore_ribotie_errors ? 'ignore' : 'retry' }
      
