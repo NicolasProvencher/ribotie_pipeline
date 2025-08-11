@@ -2,6 +2,11 @@
 
 
 process BOWTIE_ALIGN {
+    memory { 
+        def base = 35.GB
+        def input_factor = file.size().sum() / (1024**3) * 2
+        return (base + Math.max(5, input_factor).GB) * task.attempt
+    }
     beforeScript 'module load bowtie2'  
     // Maximum attempt of 3    
     // Dynamic strategy: retry up to the 3rd attempt, then ignore  
@@ -9,7 +14,7 @@ process BOWTIE_ALIGN {
     publishDir "${params.outdir_stage_stage}/bowtie/${gse}_${drug}_${bio}/${gsm}", mode: 'link', overwrite: true
        
     input:
-    val(meta)
+    tuple val(meta), path(file)
 
 
     output:
@@ -148,45 +153,72 @@ process RUN_RIBOTIE {
 
 
 
+
+
 workflow {
-    Channel
-        .fromPath(["${params.trimmed_fastq_dir}/*.fq"])
+    // Keep your named tuples as they are
+    trimmed_files_ch = Channel
+        .fromPath("${params.trimmed_fastq_dir}/*.fq")
         .map { file -> 
-            file.simpleName.split('_')[0]
+            def gsm = file.simpleName.split('_')[0]
+            [GSM_ID:gsm, FILE:file]  // Named tuple
         }
-        .unique()
-        .collect().set { trimmed_fastq }
-    // Main channel containing the CSV data, branched into two sub-channels depending
-    // on whether the file is present in the trimmed folder or not
-    Channel
+
+    metadata_ch = Channel
         .fromPath(params.input_csv)
         .splitCsv(header: true)
         .flatMap { row -> 
             row.Sample_accession
                 .split(';')
-                .collect{it.trim()}
-                .collect { GSM -> 
-                    [
+                .collect { it.trim() }
+                .collect { gsm -> 
+                    [GSM_ID:gsm, META:[
                         GSE: row.Study_accession,
-                        GSM: GSM,
+                        GSM: gsm,
                         drug: row.Drug,
                         sample_type: row.Biological_type,
                         trimming_args: row.Trim_arg,
                         paired_end: row.paired_end.toBoolean(),
                         sp: row.Species
-                    ]
+                    ]]
                 }
         }
-        .branch {
-            trimmed_files: trimmed_fastq.val.contains(it.GSM)
-            missing: true
-        }.set { csv_channel }
-    csv_channel.missing.view { "CSV channel missing files: $it" }
 
-    BOWTIE_ALIGN(csv_channel.trimmed_files)
+    // Use the 'by' parameter to specify the join key field
+    joined_ch = metadata_ch.join(trimmed_files_ch, by: 'GSM_ID', remainder: true)
+    // Result: [GSM_ID: gsm_value, META: metadata_map, FILE: file_or_null]
+    
+    // Split into matched and missing file entries
+    matched_ch = joined_ch
+        .filter { entry -> entry.FILE != null }
+        .map { entry -> [entry.GSM_ID, entry.FILE, entry.META] }
+    
+    missing_files_ch = joined_ch
+        .filter { entry -> entry.FILE == null }
+        .map { entry -> [entry.GSM_ID, entry.META] }
+    
+    // Report missing files
+    missing_files_ch.view { gsm, metadata ->
+        "WARNING: Missing trimmed file for GSM ${gsm} from study ${metadata.GSE} (${metadata.sample_type}, ${metadata.drug})"
+    }
+    
+    // Create summary of missing files
+    missing_summary_ch = missing_files_ch
+        .collect()
+        .map { missing_list ->
+            if (missing_list.size() > 0) {
+                def count = missing_list.size()
+                def gsm_list = missing_list.collect { gsm, metadata -> gsm }.join(', ')
+                "SUMMARY: ${count} GSM samples missing trimmed files: ${gsm_list}"
+            } else {
+                "All samples have corresponding files!"
+            }
+        }
+    
+    missing_summary_ch.view()
+    BOWTIE_ALIGN(matched_ch.META, matched_ch.FILE)
     STAR_ALIGN(BOWTIE_ALIGN.out.meta)
-
-
-
-
+    
+    // Use matched_ch for downstream processes
+    // matched_ch emits: [GSM, file_path, metadata_map]
 }

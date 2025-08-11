@@ -56,21 +56,21 @@ process TRIM_GALORE {
 
     output:
     val(meta), emit: meta
-    path("${meta.GSM}*_trimmed.fq"), emit: trimmed
+    path("${meta.GSM}*.fq"), emit: trimmed
     path("${meta.GSM}*_trimming_report.txt")
 
     conda "trim-galore"
 
     script:
-    def files  = meta.paired_end ? "-- paired ${params.fastq_dir}/${meta.GSM}_1.fastq ${params.fastq_dir}/${meta.GSM}_2.fastq" : "${params.fastq_dir}/${meta.GSM}.fastq"
+    def files  = meta.paired_end ? "--paired ${params.fastq_dir}/${meta.GSM}_1.fastq ${params.fastq_dir}/${meta.GSM}_2.fastq" : "${params.fastq_dir}/${meta.GSM}.fastq"
     def trimming_arg = meta.trimming_args ?: "" 
     """
     echo "[INFO] TRIM_GALORE_PAIRED : Starting trim of GSM: ${meta.GSM}"
     echo "Trimming arguments: ${trimming_arg}, meta.trimming_args: ${meta.trimming_args}"
     trim_galore \
-    --trim-n \
     --length 20 \
     --quality 25 \
+    --max_length 39 \
     ${trimming_arg} \
     ${files}
     echo "[SUCCESS] TRIM_GALORE_PAIRED : Completed GSM: ${meta.GSM}"
@@ -93,9 +93,11 @@ process FASTQC_POST {
     conda "fastqc"
 
     script:
+    def files  = meta.paired_end ? "${trim[0]} ${trim[1]}" : "${trim}"
         """
         echo "[INFO] FASTQC_POST : Starting fastqc of GSM: ${meta.GSM}"   
-        fastqc -o \$(pwd) ${trim}
+        echo "fastqc -o \$(pwd) ${files}"
+        fastqc -o \$(pwd) ${files}
         echo "[SUCCESS] FASTQC_POST : Downloaded GSM: ${meta.GSM}"     
         """
 }
@@ -168,7 +170,7 @@ workflow {
 
     TRIM_GALORE(all_samples)
     FASTQC_PRE(all_samples)
-    TRIM_GALORE.out.meta.view { "TRIM_GALORE output: $it" }
+    // TRIM_GALORE.out.meta.view { "TRIM_GALORE output: $it" }
     FASTQC_POST(TRIM_GALORE.out.meta, TRIM_GALORE.out.trimmed)
 
     // regrouping channels to run multiqc on a multitude of sample fomr the same study
