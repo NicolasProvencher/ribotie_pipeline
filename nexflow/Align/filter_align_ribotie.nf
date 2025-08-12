@@ -1,17 +1,12 @@
 
 
-
 process BOWTIE_ALIGN {
-    memory { 
-        def base = 35.GB
-        def input_factor = file.size().sum() / (1024**3) * 2
-        return (base + Math.max(5, input_factor).GB) * task.attempt
-    }
+
     beforeScript 'module load bowtie2'  
     // Maximum attempt of 3    
     // Dynamic strategy: retry up to the 3rd attempt, then ignore  
-    tag "${gsm}"
-    publishDir "${params.outdir_stage_stage}/bowtie/${gse}_${drug}_${bio}/${gsm}", mode: 'link', overwrite: true
+    tag "${meta.GSM}"
+    publishDir "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/bowtie", mode: 'link', overwrite: true
        
     input:
     tuple val(meta), path(file)
@@ -20,7 +15,7 @@ process BOWTIE_ALIGN {
     output:
     val(meta), emit: meta
     path("*_filtered.fq"), emit: unmapped
-    path("${gsm}_bowtie.log"), emit: log_file
+    path("${meta.GSM}_bowtie.log"), emit: log_file
 
     script:
     // Retrieve the index prefix (without extension)
@@ -97,7 +92,7 @@ process RUN_RIBOTIE_DATA {
     tuple val(meta), path(aligned_transcriptome)
     
     output:
-    val(meta) emit: meta
+    val(meta), emit: meta
     val(aligned_transcriptome), emit: aligned_transcriptome
     path("ribotie_data_log.txt")
     
@@ -158,7 +153,7 @@ process RUN_RIBOTIE {
 workflow {
     // Keep your named tuples as they are
     trimmed_files_ch = Channel
-        .fromPath("${params.trimmed_fastq_dir}/*.fq")
+        .fromPath("${params.trimmed_fastq_dir}/*.fq.gz")
         .map { file -> 
             def gsm = file.simpleName.split('_')[0]
             [GSM_ID:gsm, FILE:file]  // Named tuple
