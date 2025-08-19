@@ -124,7 +124,7 @@ workflow {
         .map { missing_list ->
             if (missing_list.size() > 0) {
                 def count = missing_list.size()
-                def gsm_list = missing_list.collect { gsm, metadata -> gsm }.join(', ')
+                def gsm_list = missing_list.collect { gsm, _metadata -> gsm }.join(', ')
                 "SUMMARY: ${count} GSM samples missing trimmed files: ${gsm_list}"
             } else {
                 "All samples have corresponding files!"

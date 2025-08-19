@@ -22,7 +22,7 @@ process FASTQ_DUMP {
 process FASTQC_PRE {
     tag "$meta.GSM"
     publishDir "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/fastqc_pre", mode: 'link', overwrite: true
-
+    conda "fastqc"
     input:
     val (meta)
 
@@ -30,7 +30,7 @@ process FASTQC_PRE {
     val (meta), emit : meta
     tuple path("*.html") , path("*.zip"), emit : files
 
-    conda "fastqc"
+
 
     script:
     def reads = meta.paired_end ? "${params.fastq_dir}/${meta.GSM}_1.fastq ${params.fastq_dir}/${meta.GSM}_2.fastq" : "${params.fastq_dir}/${meta.GSM}.fastq"
@@ -50,7 +50,7 @@ process TRIM_GALORE {
     publishDir "${params.trimmed_fastq_dir}", mode: 'link', overwrite: true
 
     publishDir "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/trimmed", mode: 'link', overwrite: true
-
+    conda "trim-galore"
     input:
     val(meta)
 
@@ -59,7 +59,7 @@ process TRIM_GALORE {
     path("${meta.GSM}*.fq"), emit: trimmed
     path("${meta.GSM}*_trimming_report.txt")
 
-    conda "trim-galore"
+
 
     script:
     def files  = meta.paired_end ? "--paired ${params.fastq_dir}/${meta.GSM}_1.fastq ${params.fastq_dir}/${meta.GSM}_2.fastq" : "${params.fastq_dir}/${meta.GSM}.fastq"
@@ -81,6 +81,7 @@ process TRIM_GALORE {
 process FASTQC_POST {
     tag "$meta.GSM"
     publishDir "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/fastqc_post", mode: 'link', overwrite: true
+    conda "fastqc"
 
     input:
     val(meta)
@@ -90,7 +91,7 @@ process FASTQC_POST {
     val (meta), emit : meta
     tuple path("*.html"), path("*.zip"), emit: files
 
-    conda "fastqc"
+    
 
     script:
     def files  = meta.paired_end ? "${trim[0]} ${trim[1]}" : "${trim}"
@@ -105,14 +106,14 @@ process FASTQC_POST {
 process MULTIQC {
     tag "multiqc"
     publishDir "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/multiqc", mode: 'link', overwrite: true
-
+    conda "multiqc"
     input:
     val (meta)
 
     output:
     path("multiqc_report.html"), emit: multiqc_report
 
-    conda "multiqc"
+
 
     script:
     """
@@ -177,7 +178,7 @@ workflow {
     FASTQC_POST.out.meta
         .map { item -> [item.GSE + "_" + item.drug + '_' + item.sample_type, item] }
         .groupTuple()
-        .map { key, items -> [
+        .map { _key, items -> [
             GSE: items[0].GSE,
             drug: items[0].drug,
             GSMs: items.collect { it.GSM },
