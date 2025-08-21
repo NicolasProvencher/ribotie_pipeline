@@ -1,7 +1,7 @@
 
 
 process BOWTIE_ALIGN {
-
+    cache 'lenient'
     beforeScript 'module load bowtie2'  
     tag "${meta.GSM}"
     publishDir "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/bowtie", mode: 'link', overwrite: true
@@ -31,6 +31,7 @@ process BOWTIE_ALIGN {
 }
 
 process STAR_ALIGN {
+    cache 'lenient'
     beforeScript 'module load star'
     tag "${meta.GSM}"
     publishDir "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/star", mode: 'link', overwrite: true
@@ -46,7 +47,7 @@ process STAR_ALIGN {
     path("*")
 
     script:
-    def filtered_fq = meta.paired_end ? "${meta.GSM}_filtered_1.fq ${meta.GSM}_filtered_2.fq" : "${meta.GSM}_filtered.fq"
+    def filtered_fq = meta.paired_end ? "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/bowtie/${meta.GSM}_filtered_1.fq.gz ${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/bowtie/${meta.GSM}_filtered_2.fq.gz" : "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/bowtie/${meta.GSM}_filtered.fq.gz"
     """    
     STAR --runThreadN 5 \
          --genomeDir ${params.star_index[meta.sp]} \
