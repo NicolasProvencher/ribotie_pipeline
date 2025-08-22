@@ -53,6 +53,7 @@ process STAR_ALIGN {
          --genomeDir ${params.star_index[meta.sp]} \
          --genomeLoad NoSharedMemory \
          --readFilesIn ${filtered_fq} \
+         --readFilesCommand zcat \
          --outFileNamePrefix ${meta.GSM}_ \
          --outSAMtype BAM Unsorted \
          --quantMode TranscriptomeSAM \
@@ -63,6 +64,7 @@ process STAR_ALIGN {
          --seedSearchStartLmaxOverLread 0.5 \
          --alignEndsType EndToEnd \
          --outTmpDir \$SLURM_TMPDIR/star_tmp \
+
     """
 }
 

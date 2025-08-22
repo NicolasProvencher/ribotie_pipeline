@@ -3,19 +3,11 @@
 //TODO arrange this for once per file
 //TODO correclty output the h5 db
 process RUN_RIBOTIE_DATA {
-    
-    // Use appropriate resources
-    // cpus 8
-    // memory '80 GB * ${task.attempt}'
-    // time '24h'
-    // maxRetries 3
     beforeScript 'module load python cuda cudnn arrow '
-    // clusterOptions = '--account=rrg-xroucou'
-    
-    // Publish results
-    publishDir "${params.outdir_ribotie}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/ribotie", mode: 'copy'
-    // errorStrategy { params.ignore_ribotie_errors ? 'ignore' : 'retry' }
-    
+    publishDir "${params.outdir_ribotie}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/ribotie", mode: 'link', overwrite: true
+    cache 'lenient'
+    tag "${meta.GSM}"
+
     input:
     tuple val(meta), path(aligned_transcriptome)
     
@@ -27,31 +19,34 @@ process RUN_RIBOTIE_DATA {
     script:
     """
     # Prepare the environment
-    export PATH="\$PATH:${params.ribotie_dir}/bin"
     virtualenv --no-download \$SLURM_TMPDIR/env
     source \$SLURM_TMPDIR/env/bin/activate
     pip install --no-index transcript_transformer
-    
+
+    cp /home/noxatras/scratch/ribotie/reference/HS/stuff.h5 \$SLURM_TMPDIR/${meta.GSM}.h5
     # Run RiboTIE with the YAML file as template
-    ribotie ${yaml_file} --data > ribotie_data_log.txt 2>&1
+    ribotie --data \
+        --gtf_path ${params.gtf_path} \
+        --fa_path ${params.fa_path} \
+        --h5_path \$SLURM_TMPDIR/${meta.GSM}.h5 \
+        --out_prefix ${meta.GSM} \
+        --ribo_paths ${ribopath} \ 
+        --samples ${samples}
+
+
+    cp \$SLURM_TMPDIR/${meta.GSM}.h5 \$PWD
 
     """
+    // fix bam path and sample here 
 }
 
 // TODO correctly publish the csv results and the wieghts i guess, nah fuck the weights
 process RUN_RIBOTIE {
-    tag "${gse}_${drug}_${bio}"
-     // Use appropriate resources
-    // cpus 8
-    // memory '60 GB'
-    // time '24h'
-    // maxRetries 2
+    tag "${meta.GSM}"
     beforeScript 'module load python/3.9 cuda cudnn arrow'
-    // clusterOptions = '--account=def-xroucou --gres=gpu:1'
-    // Publish results
-    publishDir "${params.outdir_ribotie}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/ribotie", mode: 'copy'
-    // errorStrategy { params.ignore_ribotie_errors ? 'ignore' : 'retry' }
-     
+    publishDir "${params.outdir_ribotie}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/ribotie", mode: 'link', overwrite: true
+    cache 'lenient'
+
     input:
     val(meta)
     
@@ -62,7 +57,6 @@ process RUN_RIBOTIE {
     script:
     """
     # Prepare the environment
-    export PATH="\$PATH:${params.ribotie_dir}/bin"
     virtualenv --no-download \$SLURM_TMPDIR/env
     source \$SLURM_TMPDIR/env/bin/activate
     pip install --no-index transcript_transformer
