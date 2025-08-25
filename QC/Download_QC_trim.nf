@@ -171,7 +171,6 @@ workflow {
         .filter { it[1] != null && it[2] == null }
         .map { it[1] } // [GSM]
 
-    no_download.view()
 
     FASTQ_DUMP(to_download)
 
