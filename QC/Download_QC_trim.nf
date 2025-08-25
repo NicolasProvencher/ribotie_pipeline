@@ -127,16 +127,15 @@ process MULTIQC {
 
 // Main workflow
 workflow {
-    log.info "Starting pipeline for existing files only..."
     // Channel that check for previously downloaded fastqs
     //TODO add a 2nd path to check for the old fastq files 
     Channel
         .fromPath(["${params.fastq_dir}/*.f*"])
         .map { file -> 
-            file.simpleName.replaceFirst(/_[12]$/, '')
+            [file.simpleName.replaceFirst(/_[12]$/, ''), true]
         }
         .unique()
-        .collect().set { existing_fastq }
+        .set { existing_fastq }
 
     // Main channel containing the CSV data, branched into two sub-channels depending
     // on whether the sample is already downloaded or not for the FASTQ_DUMP process
@@ -148,7 +147,7 @@ workflow {
             row.Sample_accession
                 .split(';')
                 .collect{it.trim()}
-                .collect { GSM -> 
+                .collect { GSM -> [GSM,
                     [
                         GSE: row.Study_accession,
                         GSM: GSM,
@@ -157,38 +156,45 @@ workflow {
                         trimming_args: row.Trim_arg,
                         paired_end: row.paired_end.toBoolean(),
                         sp: row.Species
-                    ]
+                    ]]
                 }
-        }
-        .branch {
-            existing: existing_fastq.val.split('/')[-1].split(',')[0] == it.GSM
-            to_download: true
         }.set { csv_channel }
 
-    csv_channel.existing.view { "CSV Channel existing: $it" }
-    csv_channel.to_download.view { "CSV Channel to download: $it" }
-    // FASTQ_DUMP(csv_channel.to_download)
 
-    // all_samples = FASTQ_DUMP.out.meta.mix(csv_channel.existing)
+    joined=csv_channel.join(existing_fastq, by : 0, remainder: true)
 
-    // TRIM_GALORE(all_samples)
-    // FASTQC_PRE(all_samples)
-    // // TRIM_GALORE.out.meta.view { "TRIM_GALORE output: $it" }
-    // FASTQC_POST(TRIM_GALORE.out.meta, TRIM_GALORE.out.trimmed)
+    no_download = joined
+        .filter { it[1] != null && it[2] != null }
+        .map { it[1] } // [META]
 
-    // // regrouping channels to run multiqc on a multitude of sample fomr the same study
-    // FASTQC_POST.out.meta
-    //     .map { item -> [item.GSE + "_" + item.drug + '_' + item.sample_type, item] }
-    //     .groupTuple()
-    //     .map { _key, items -> [
-    //         GSE: items[0].GSE,
-    //         drug: items[0].drug,
-    //         GSMs: items.collect { it.GSM },
-    //         riboseq_type: items[0].riboseq_type,
-    //         sample_type: items[0].sample_type,
-    //         sp: items[0].sp
-    //     ]}
-    //     .set { collapsed_ch }
+    to_download = joined
+        .filter { it[1] != null && it[2] == null }
+        .map { it[1] } // [GSM]
 
-    // MULTIQC(collapsed_ch)
+    no_download.view()
+
+    FASTQ_DUMP(to_download)
+
+    all_samples = FASTQ_DUMP.out.meta.mix(no_download)
+
+    TRIM_GALORE(all_samples)
+    FASTQC_PRE(all_samples)
+    // TRIM_GALORE.out.meta.view { "TRIM_GALORE output: $it" }
+    FASTQC_POST(TRIM_GALORE.out.meta, TRIM_GALORE.out.trimmed)
+
+    // regrouping channels to run multiqc on a multitude of sample fomr the same study
+    FASTQC_POST.out.meta
+        .map { item -> [item.GSE + "_" + item.drug + '_' + item.sample_type, item] }
+        .groupTuple()
+        .map { _key, items -> [
+            GSE: items[0].GSE,
+            drug: items[0].drug,
+            GSMs: items.collect { it.GSM },
+            riboseq_type: items[0].riboseq_type,
+            sample_type: items[0].sample_type,
+            sp: items[0].sp
+        ]}
+        .set { collapsed_ch }
+
+    MULTIQC(collapsed_ch)
 }
