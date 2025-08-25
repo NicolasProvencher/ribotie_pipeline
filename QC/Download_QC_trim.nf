@@ -161,32 +161,34 @@ workflow {
                 }
         }
         .branch {
-            existing: existing_fastq.val.contains(it.GSM)
+            existing: existing_fastq.val.split('/')[-1].split(',')[0] == it.GSM
             to_download: true
         }.set { csv_channel }
 
-    FASTQ_DUMP(csv_channel.to_download)
+    csv_channel.existing.view { "CSV Channel existing: $it" }
+    csv_channel.to_download.view { "CSV Channel to download: $it" }
+    // FASTQ_DUMP(csv_channel.to_download)
 
-    all_samples = FASTQ_DUMP.out.meta.mix(csv_channel.existing)
+    // all_samples = FASTQ_DUMP.out.meta.mix(csv_channel.existing)
 
-    TRIM_GALORE(all_samples)
-    FASTQC_PRE(all_samples)
-    // TRIM_GALORE.out.meta.view { "TRIM_GALORE output: $it" }
-    FASTQC_POST(TRIM_GALORE.out.meta, TRIM_GALORE.out.trimmed)
+    // TRIM_GALORE(all_samples)
+    // FASTQC_PRE(all_samples)
+    // // TRIM_GALORE.out.meta.view { "TRIM_GALORE output: $it" }
+    // FASTQC_POST(TRIM_GALORE.out.meta, TRIM_GALORE.out.trimmed)
 
-    // regrouping channels to run multiqc on a multitude of sample fomr the same study
-    FASTQC_POST.out.meta
-        .map { item -> [item.GSE + "_" + item.drug + '_' + item.sample_type, item] }
-        .groupTuple()
-        .map { _key, items -> [
-            GSE: items[0].GSE,
-            drug: items[0].drug,
-            GSMs: items.collect { it.GSM },
-            riboseq_type: items[0].riboseq_type,
-            sample_type: items[0].sample_type,
-            sp: items[0].sp
-        ]}
-        .set { collapsed_ch }
+    // // regrouping channels to run multiqc on a multitude of sample fomr the same study
+    // FASTQC_POST.out.meta
+    //     .map { item -> [item.GSE + "_" + item.drug + '_' + item.sample_type, item] }
+    //     .groupTuple()
+    //     .map { _key, items -> [
+    //         GSE: items[0].GSE,
+    //         drug: items[0].drug,
+    //         GSMs: items.collect { it.GSM },
+    //         riboseq_type: items[0].riboseq_type,
+    //         sample_type: items[0].sample_type,
+    //         sp: items[0].sp
+    //     ]}
+    //     .set { collapsed_ch }
 
-    MULTIQC(collapsed_ch)
+    // MULTIQC(collapsed_ch)
 }
