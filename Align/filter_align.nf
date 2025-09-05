@@ -4,7 +4,7 @@ process BOWTIE_ALIGN {
     cache 'lenient'
     beforeScript 'module load bowtie2'  
     tag "${meta.GSM}"
-    publishDir "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/bowtie", mode: 'link', overwrite: true
+    publishDir "${params.path_pipeline_directory}/../output/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/bowtie", mode: 'link', overwrite: true
        
     input:
     tuple val(meta), path(file)
@@ -15,7 +15,7 @@ process BOWTIE_ALIGN {
     path("${meta.GSM}_bowtie.log"), emit: log_file
 
     script:
-    def files  = meta.paired_end ? "-1 ${params.trimmed_fastq_dir}/${meta.GSM}_1_trimmed.fq.gz -2 ${params.trimmed_fastq_dir}/${meta.GSM}_2_trimmed.fq.gz" : "-U ${params.trimmed_fastq_dir}/${meta.GSM}_trimmed.fq.gz"
+    def files  = meta.paired_end ? "-1 ${params.trimmed_fastq_dir}/${meta.GSM}_1_val_1.fq.gz -2 ${params.trimmed_fastq_dir}/${meta.GSM}_2_val_2.fq.gz" : "-U ${params.trimmed_fastq_dir}/${meta.GSM}_trimmed.fq.gz"
     def out  = meta.paired_end ? "--un-conc-gz ${meta.GSM}_filtered_%.fq.gz" : "--un-gz ${meta.GSM}_filtered.fq.gz"
     
     """    
@@ -34,7 +34,7 @@ process STAR_ALIGN {
     cache 'lenient'
     beforeScript 'module load star'
     tag "${meta.GSM}"
-    publishDir "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/star", mode: 'link', overwrite: true
+    publishDir "${params.path_pipeline_directory}/../output/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/star", mode: 'link', overwrite: true
 
     input:
     val(meta)
@@ -114,30 +114,8 @@ workflow {
         .filter { it[2] == null && it[1] != null }
         .map { [it[0], it[1]] } // 
 
-    // Report missing files
-// missing_files_ch.view { gsm, metadata ->
-//     if (metadata) {
-//         "WARNING: Missing trimmed file for GSM ${gsm} from study ${metadata.GSE} (${metadata.sample_type}, ${metadata.drug})"
-//     } else {
-//         "WARNING: Missing trimmed file for GSM ${gsm} (no metadata available)"
-//     }
-// }
-    
-//     // Create summary of missing files
-//     missing_summary_ch = missing_files_ch
-//         .collect()
-//         .map { missing_list ->
-//             if (missing_list.size() > 0) {
-//                 def count = missing_list.size()
-//                 def gsm_list = missing_list.collect { gsm, _metadata -> gsm }.join(', ')
-//                 "SUMMARY: ${count} GSM samples missing trimmed files: ${gsm_list}"
-//             } else {
-//                 "All samples have corresponding files!"
-//             }
-//         }
-    // 
-    // missing_summary_ch.view()
-    // matched_ch.view()
+
+
     missing_files_ch.view { a, b -> "missing_files_ch: ${a} - ${b}" }
     BOWTIE_ALIGN(matched_ch)
     STAR_ALIGN(BOWTIE_ALIGN.out.meta)
