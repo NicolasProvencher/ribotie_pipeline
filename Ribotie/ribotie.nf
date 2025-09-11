@@ -14,6 +14,7 @@ process RIBOTIE_DATA {
     output:
     val(meta), emit: meta
     path("${meta.GSM}.h5"), emit: h5_db
+    file(Transcriptome_Bam), emit: transcriptome_bam
     
     script:
     """
@@ -29,7 +30,7 @@ process RIBOTIE_DATA {
         --fa_path ${params.fa_path} \
         --h5_path \$SLURM_TMPDIR/${meta.GSM}.h5 \
         --out_prefix ${meta.GSM} \
-        --ribo_paths '{"${meta.GSM}": "${Transcriptome_Bam}"}' \ 
+        --ribo_paths '{"${meta.GSM}": "${Transcriptome_Bam}"}' \
         --samples ${meta.GSM} \
 
     ls \$SLURM_TMPDIR/${meta.GSM}
@@ -47,8 +48,8 @@ process RIBOTIE_ML {
     cache 'lenient'
 
     input:
-    val(meta)
-    path(h5_db)
+    tuple val(meta), path(h5_db), file(Transcriptome_Bam)
+
 
     output:
     val(meta), emit: meta
@@ -68,7 +69,7 @@ process RIBOTIE_ML {
         --fa_path ${params.fa_path} \
         --h5_path \$SLURM_TMPDIR/${meta.GSM}.h5 \
         --out_prefix ${meta.GSM} \
-        --ribo_paths '{"${gsm}": "${transcriptome_bam}"}' \
+        --ribo_paths '{"${meta.GSM}": "${Transcriptome_Bam}"}' \
         --samples ${meta.GSM} \
 
 
