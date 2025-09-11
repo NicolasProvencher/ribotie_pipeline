@@ -4,7 +4,7 @@
 //TODO correclty output the h5 db
 process RIBOTIE_DATA {
     beforeScript 'module load python/3.11 cuda cudnn arrow '
-    publishDir "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/ribotie", mode: 'link', overwrite: true
+    publishDir "${projectDir}/../output/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/ribotie", mode: 'link', overwrite: true
     cache 'lenient'
     tag "${meta.GSM}"
 
@@ -43,11 +43,12 @@ process RIBOTIE_DATA {
 process RIBOTIE_ML {
     tag "${meta.GSM}"
     beforeScript 'module load python/3.11 cuda cudnn arrow'
-    publishDir "${params.path_pipeline_directory}/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/ribotie/results", mode: 'link', overwrite: true
+    publishDir "${projectDir}/../output//${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/ribotie/results", mode: 'link', overwrite: true
     cache 'lenient'
 
     input:
-    tuple val(meta) path(h5_db)
+    val(meta)
+    path(h5_db)
 
     output:
     val(meta), emit: meta
@@ -67,7 +68,7 @@ process RIBOTIE_ML {
         --fa_path ${params.fa_path} \
         --h5_path \$SLURM_TMPDIR/${meta.GSM}.h5 \
         --out_prefix ${meta.GSM} \
-        --ribo_paths '{"${meta.GSM}": "${Transcriptome_Bam}"}' \ 
+        --ribo_paths '{"${gsm}": "${transcriptome_bam}"}' \
         --samples ${meta.GSM} \
 
 
@@ -78,7 +79,7 @@ process RIBOTIE_ML {
 // TODO adapt to file output from alignment processes
 workflow {
     trimmed_files_ch = Channel
-        .fromPath("${params.path_pipeline_directory}/../output/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/star/*_Aligned.toTranscriptome.out.bam")
+        .fromPath("${projectDir}/../output/*/*/*/star/*_Aligned.toTranscriptome.out.bam")
         .map { file -> 
             def gsm = file.simpleName.split('_')[0]
             [gsm, file]  // Named tuple

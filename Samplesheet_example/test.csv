@@ -1,2 +1,2 @@
 Name,Species,Study_accession,Project_link,PMID,Treatment_type,Drug,Sample_accession,Biological_type,Ribo_type,Trim_arg,paired_end,umi
-Chothani SP,HS,GSE182377,https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE182377,35841888,post-lysis,cycloheximide,GSM5527677; GSM5527676,Brain,polysome,,False,
+Chothani SP,HS,GSE182377,https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE182377,35841888,post-lysis,cycloheximide,GSM5527677,Brain,polysome,,False,
