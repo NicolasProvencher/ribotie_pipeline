@@ -14,7 +14,7 @@ process RIBOTIE_DATA {
     output:
     val(meta), emit: meta
     path("${meta.GSM}.h5"), emit: h5_db
-    file(Transcriptome_Bam), emit: transcriptome_bam
+    path(Transcriptome_Bam), emit: transcriptome_bam
     
     script:
     """
@@ -22,13 +22,13 @@ process RIBOTIE_DATA {
     virtualenv --no-download \$SLURM_TMPDIR/env
     source \$SLURM_TMPDIR/env/bin/activate
     pip install --no-index ${params.ribotie_package_path}
-
-    cp ${params.reference_files_directory}/reference/HS/Homo_sapiens.GRCh38.114.h5 \$SLURM_TMPDIR/${meta.GSM}/${meta.GSM}.h5
+    mkdir -p \$SLURM_TMPDIR/${meta.GSM}
+    cp ${params.reference_files_directory}/HS/Homo_sapiens.GRCh38.114.h5 \$SLURM_TMPDIR/${meta.GSM}/${meta.GSM}.h5
 
     ribotie --data \
-        --gtf_path ${params.gtf_path} \
-        --fa_path ${params.fa_path} \
-        --h5_path \$SLURM_TMPDIR/${meta.GSM}.h5 \
+        --gtf_path ${params.annotation_GTF[meta.sp]} \
+        --fa_path ${params.dna_assembly[meta.sp]} \
+        --h5_path \$SLURM_TMPDIR/${meta.GSM}/${meta.GSM}.h5 \
         --out_prefix ${meta.GSM} \
         --ribo_paths '{"${meta.GSM}": "${Transcriptome_Bam}"}' \
         --samples ${meta.GSM} \
@@ -44,11 +44,13 @@ process RIBOTIE_DATA {
 process RIBOTIE_ML {
     tag "${meta.GSM}"
     beforeScript 'module load python/3.11 cuda cudnn arrow'
-    publishDir "${projectDir}/../output//${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/ribotie/results", mode: 'link', overwrite: true
+    publishDir "${projectDir}/../output/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/ribotie/results", mode: 'link', overwrite: true
     cache 'lenient'
 
     input:
-    tuple val(meta), path(h5_db), file(Transcriptome_Bam)
+    val(meta)
+    path(h5_db)
+    path(Transcriptome_Bam)
 
 
     output:
@@ -61,13 +63,13 @@ process RIBOTIE_ML {
     virtualenv --no-download \$SLURM_TMPDIR/env
     source \$SLURM_TMPDIR/env/bin/activate
     pip install --no-index ${params.ribotie_package_path}
-
+    mkdir -p \$SLURM_TMPDIR/${meta.GSM}
     cp ${h5_db} \$SLURM_TMPDIR/${meta.GSM}/${meta.GSM}.h5
 
     ribotie \
-        --gtf_path ${params.gtf_path} \
-        --fa_path ${params.fa_path} \
-        --h5_path \$SLURM_TMPDIR/${meta.GSM}.h5 \
+        --gtf_path ${params.annotation_GTF[meta.sp]} \
+        --fa_path ${params.dna_assembly[meta.sp]} \
+        --h5_path \$SLURM_TMPDIR/${meta.GSM}/${meta.GSM}.h5 \
         --out_prefix ${meta.GSM} \
         --ribo_paths '{"${meta.GSM}": "${Transcriptome_Bam}"}' \
         --samples ${meta.GSM} \
