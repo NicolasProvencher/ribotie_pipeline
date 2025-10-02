@@ -8,4 +8,4 @@
 
 module load bowtie2
 
-bowtie2-build reference/HS/snRNA_snoRNA_rRNA_HS_ensembl113.fasta reference/HS/snRNA_snoRNA_rRNA_HS_ensembl113_index
+bowtie2-build reference/HS/contaminant_transcriptome.fa reference/HS/contaminant_transcriptome_index
