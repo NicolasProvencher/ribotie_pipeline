@@ -3,7 +3,7 @@
 //TODO arrange this for once per file
 //TODO correclty output the h5 db
 process RIBOTIE_DATA {
-    beforeScript 'module load python/3.11 cuda cudnn arrow '
+    beforeScript 'module load python/3.11 cuda/12.2 cudnn/9.2 arrow/21.0'
     publishDir "${projectDir}/../output/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/ribotie", mode: 'link', overwrite: true
     cache 'lenient'
     tag "${meta.GSM}"
@@ -21,11 +21,12 @@ process RIBOTIE_DATA {
     # Prepare the environment
     virtualenv --no-download \$SLURM_TMPDIR/env
     source \$SLURM_TMPDIR/env/bin/activate
-    pip install --no-index ${params.ribotie_package_path}
+    pip install --no-index ${params.ribotie_package}
     mkdir -p \$SLURM_TMPDIR/${meta.GSM}
     cp ${params.reference_files_directory}/HS/Homo_sapiens.GRCh38.114.h5 \$SLURM_TMPDIR/${meta.GSM}/${meta.GSM}.h5
 
     ribotie --data \
+        --cores 1 \
         --gtf_path ${params.annotation_GTF[meta.sp]} \
         --fa_path ${params.dna_assembly[meta.sp]} \
         --h5_path \$SLURM_TMPDIR/${meta.GSM}/${meta.GSM}.h5 \
@@ -43,7 +44,7 @@ process RIBOTIE_DATA {
 // TODO correctly publish the csv results and the wieghts i guess, nah fuck the weights
 process RIBOTIE_ML {
     tag "${meta.GSM}"
-    beforeScript 'module load python/3.11 cuda cudnn arrow'
+    beforeScript 'module load python/3.11 cuda/12.2 cudnn/9.2 arrow/21.0'
     publishDir "${projectDir}/../output/${meta.sp}/${meta.GSE}_${meta.drug}_${meta.sample_type}/${meta.GSM}/ribotie/results", mode: 'link', overwrite: true
     cache 'lenient'
 
@@ -62,7 +63,7 @@ process RIBOTIE_ML {
     # Prepare the environment
     virtualenv --no-download \$SLURM_TMPDIR/env
     source \$SLURM_TMPDIR/env/bin/activate
-    pip install --no-index ${params.ribotie_package_path}
+    pip install --no-index ${params.ribotie_package}
     mkdir -p \$SLURM_TMPDIR/${meta.GSM}
     cp ${h5_db} \$SLURM_TMPDIR/${meta.GSM}/${meta.GSM}.h5
 
